@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Instituto Espejo — Pedí tu turno</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,500;0,600;1,500&display=swap" rel="stylesheet">
+<script>// ============================================================
+//  INSTITUTO ESPEJO — Datos compartidos del demo
+//  En producción esto vendría de Firebase Firestore
+// ============================================================
+
+const PROFESIONALES = [
+  {
+    id: 'p1',
+    nombre: 'Dr. Alejandro Méndez',
+    especialidad: 'Implantología y Cirugía',
+    color: '#1A4E7A',
+    colorLight: '#EBF3FB',
+    iniciales: 'AM',
+    dias: [1, 2, 3, 4, 5],        // lun-vie
+    horaInicio: 9,
+    horaFin: 17,
+    duracionTurno: 30,             // minutos
+  },
+  {
+    id: 'p2',
+    nombre: 'Dra. Valeria Castillo',
+    especialidad: 'Ortodoncia',
+    color: '#1D9E75',
+    colorLight: '#E1F5EE',
+    iniciales: 'VC',
+    dias: [1, 3, 5],              // lun, mié, vie
+    horaInicio: 8,
+    horaFin: 14,
+    duracionTurno: 45,
+  },
+  {
+    id: 'p3',
+    nombre: 'Dr. Martín Olivares',
+    especialidad: 'Odontología General',
+    color: '#BA7517',
+    colorLight: '#FAEEDA',
+    iniciales: 'MO',
+    dias: [2, 3, 4, 6],          // mar, mié, jue, sáb
+    horaInicio: 9,
+    horaFin: 18,
+    duracionTurno: 30,
+  },
+  {
+    id: 'p4',
+    nombre: 'Dra. Sofía Ramírez',
+    especialidad: 'Blanqueamiento y Estética',
+    color: '#993556',
+    colorLight: '#FBEAF0',
+    iniciales: 'SR',
+    dias: [1, 2, 4, 5],
+    horaInicio: 10,
+    horaFin: 17,
+    duracionTurno: 60,
+  },
+  {
+    id: 'p5',
+    nombre: 'Dr. Lucas Ferreira',
+    especialidad: 'Endodoncia',
+    color: '#533BAF',
+    colorLight: '#EEEDFE',
+    iniciales: 'LF',
+    dias: [1, 3, 4],
+    horaInicio: 8,
+    horaFin: 15,
+    duracionTurno: 60,
+  },
+];
+
+const SERVICIOS = [
+  'Consulta general',
+  'Limpieza dental',
+  'Extracción',
+  'Ortodoncia - control',
+  'Implante dental',
+  'Blanqueamiento',
+  'Radiografía',
+  'Endodoncia',
+  'Cirugía',
+  'Urgencia',
+];
+
+// Turnos demo (semana 16-21 jun 2025)
+let TURNOS = [
+  { id:'t1',  profesionalId:'p1', paciente:'María González',    tel:'2604123456', fecha:'2025-06-16', hora:'09:00', servicio:'Implante dental',       estado:'confirmado', origen:'presencial', notas:'Revisión post-op' },
+  { id:'t2',  profesionalId:'p1', paciente:'Roberto Herrera',   tel:'2604456789', fecha:'2025-06-16', hora:'10:00', servicio:'Cirugía',               estado:'confirmado', origen:'online',     notas:'Alérgico a penicilina' },
+  { id:'t3',  profesionalId:'p1', paciente:'Diego Molina',      tel:'2604678901', fecha:'2025-06-16', hora:'11:00', servicio:'Implante dental',       estado:'pendiente',  origen:'online',     notas:'Primera consulta' },
+  { id:'t4',  profesionalId:'p2', paciente:'Ana Martínez',      tel:'2604345678', fecha:'2025-06-16', hora:'09:00', servicio:'Ortodoncia - control',  estado:'confirmado', origen:'presencial', notas:'' },
+  { id:'t5',  profesionalId:'p2', paciente:'Carlos Ruiz',       tel:'2604234567', fecha:'2025-06-16', hora:'10:30', servicio:'Ortodoncia - control',  estado:'confirmado', origen:'online',     notas:'' },
+  { id:'t6',  profesionalId:'p3', paciente:'Lucía Pérez',       tel:'2604567890', fecha:'2025-06-16', hora:'09:00', servicio:'Limpieza dental',       estado:'confirmado', origen:'presencial', notas:'' },
+  { id:'t7',  profesionalId:'p3', paciente:'Gonzalo Ponce',     tel:'2604444555', fecha:'2025-06-16', hora:'10:00', servicio:'Consulta general',      estado:'cancelado',  origen:'online',     notas:'' },
+  { id:'t8',  profesionalId:'p3', paciente:'Martín López',      tel:'2604890123', fecha:'2025-06-16', hora:'11:00', servicio:'Extracción',            estado:'confirmado', origen:'presencial', notas:'' },
+  { id:'t9',  profesionalId:'p4', paciente:'Sofía Torres',      tel:'2604789012', fecha:'2025-06-16', hora:'10:00', servicio:'Blanqueamiento',        estado:'confirmado', origen:'online',     notas:'Segunda sesión' },
+  { id:'t10', profesionalId:'p4', paciente:'Valentina Cruz',    tel:'2604901234', fecha:'2025-06-16', hora:'11:00', servicio:'Blanqueamiento',        estado:'pendiente',  origen:'online',     notas:'Primera sesión' },
+  { id:'t11', profesionalId:'p5', paciente:'Fernando Díaz',     tel:'2604012345', fecha:'2025-06-16', hora:'08:00', servicio:'Endodoncia',            estado:'confirmado', origen:'presencial', notas:'' },
+  { id:'t12', profesionalId:'p5', paciente:'Patricia Sosa',     tel:'2604111222', fecha:'2025-06-16', hora:'09:00', servicio:'Endodoncia',            estado:'confirmado', origen:'online',     notas:'Continuación' },
+  // martes 17
+  { id:'t13', profesionalId:'p1', paciente:'Hernán Flores',     tel:'2604666777', fecha:'2025-06-17', hora:'09:00', servicio:'Implante dental',       estado:'confirmado', origen:'online',     notas:'' },
+  { id:'t14', profesionalId:'p3', paciente:'Natalia Romero',    tel:'2604333444', fecha:'2025-06-17', hora:'09:00', servicio:'Consulta general',      estado:'confirmado', origen:'presencial', notas:'' },
+  { id:'t15', profesionalId:'p3', paciente:'Alejandro Vera',    tel:'2604222333', fecha:'2025-06-17', hora:'11:00', servicio:'Limpieza dental',       estado:'pendiente',  origen:'online',     notas:'' },
+  { id:'t16', profesionalId:'p4', paciente:'Cecilia Reyes',     tel:'2604777888', fecha:'2025-06-17', hora:'10:00', servicio:'Blanqueamiento',        estado:'confirmado', origen:'online',     notas:'' },
+  { id:'t17', profesionalId:'p5', paciente:'Pablo Medina',      tel:'2604888999', fecha:'2025-06-17', hora:'08:00', servicio:'Endodoncia',            estado:'confirmado', origen:'presencial', notas:'' },
+  // miércoles 18
+  { id:'t18', profesionalId:'p1', paciente:'Florencia Castro',  tel:'2604999000', fecha:'2025-06-18', hora:'10:00', servicio:'Cirugía',               estado:'confirmado', origen:'online',     notas:'' },
+  { id:'t19', profesionalId:'p2', paciente:'Laura Sánchez',     tel:'2604555666', fecha:'2025-06-18', hora:'08:00', servicio:'Ortodoncia - control',  estado:'confirmado', origen:'presencial', notas:'' },
+  { id:'t20', profesionalId:'p3', paciente:'Ignacio Moreno',    tel:'2604000111', fecha:'2025-06-18', hora:'09:30', servicio:'Radiografía',           estado:'confirmado', origen:'online',     notas:'' },
+  { id:'t21', profesionalId:'p5', paciente:'Claudia Vega',      tel:'2604100200', fecha:'2025-06-18', hora:'09:00', servicio:'Endodoncia',            estado:'pendiente',  origen:'online',     notas:'Derivación externa' },
+  // jueves 19
+  { id:'t22', profesionalId:'p1', paciente:'Ramón Gutiérrez',   tel:'2604200300', fecha:'2025-06-19', hora:'09:00', servicio:'Implante dental',       estado:'confirmado', origen:'presencial', notas:'' },
+  { id:'t23', profesionalId:'p3', paciente:'Elena Peralta',     tel:'2604300400', fecha:'2025-06-19', hora:'10:00', servicio:'Consulta general',      estado:'confirmado', origen:'online',     notas:'' },
+  { id:'t24', profesionalId:'p4', paciente:'Jorge Blanco',      tel:'2604400500', fecha:'2025-06-19', hora:'11:00', servicio:'Blanqueamiento',        estado:'confirmado', origen:'online',     notas:'' },
+  { id:'t25', profesionalId:'p5', paciente:'Miriam Leal',       tel:'2604500600', fecha:'2025-06-19', hora:'08:00', servicio:'Endodoncia',            estado:'confirmado', origen:'presencial', notas:'' },
+  // viernes 20
+  { id:'t26', profesionalId:'p1', paciente:'Hugo Acosta',       tel:'2604600700', fecha:'2025-06-20', hora:'11:00', servicio:'Cirugía',               estado:'confirmado', origen:'online',     notas:'' },
+  { id:'t27', profesionalId:'p2', paciente:'Sandra Ríos',       tel:'2604700800', fecha:'2025-06-20', hora:'09:00', servicio:'Ortodoncia - control',  estado:'pendiente',  origen:'online',     notas:'' },
+  { id:'t28', profesionalId:'p4', paciente:'Tomás Ibáñez',      tel:'2604800900', fecha:'2025-06-20', hora:'10:00', servicio:'Blanqueamiento',        estado:'confirmado', origen:'presencial', notas:'' },
+  // sábado 21
+  { id:'t29', profesionalId:'p3', paciente:'Karina Suárez',     tel:'2604900100', fecha:'2025-06-21', hora:'09:00', servicio:'Limpieza dental',       estado:'confirmado', origen:'presencial', notas:'' },
+  { id:'t30', profesionalId:'p3', paciente:'Pablo Ferreyra',    tel:'2604010203', fecha:'2025-06-21', hora:'11:00', servicio:'Extracción',            estado:'confirmado', origen:'online',     notas:'' },
+];
+
+let nextId = 31;
+
+// Helper: generar slots disponibles para un profesional en una fecha
+function generarSlots(profesionalId, fecha) {
+  const prof = PROFESIONALES.find(p => p.id === profesionalId);
+  if (!prof) return [];
+  const d = new Date(fecha + 'T00:00:00');
+  const dow = d.getDay(); // 0=dom,1=lun,...,6=sáb
+  if (!prof.dias.includes(dow)) return [];
+
+  const slots = [];
+  let h = prof.horaInicio;
+  let m = 0;
+  while (h < prof.horaFin) {
+    const hStr = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+    const ocupado = TURNOS.some(t =>
+      t.profesionalId === profesionalId &&
+      t.fecha === fecha &&
+      t.hora === hStr &&
+      t.estado !== 'cancelado'
+    );
+    slots.push({ hora: hStr, disponible: !ocupado });
+    m += prof.duracionTurno;
+    if (m >= 60) { h += Math.floor(m/60); m = m % 60; }
+  }
+  return slots;
+}
+
+function agregarTurno(turno) {
+  turno.id = 't' + nextId++;
+  TURNOS.push(turno);
+  return turno;
+}
+
+function actualizarEstado(id, estado) {
+  const t = TURNOS.find(x => x.id === id);
+  if (t) t.estado = estado;
+}
+
+// Exportar globalmente
+window.IE = { PROFESIONALES, SERVICIOS, TURNOS, generarSlots, agregarTurno, actualizarEstado };
+</script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --azul:#1A4E7A;--azul-med:#2E6FAD;--azul-pal:#EBF3FB;
+  --verde:#1D9E75;--verde-pal:#E1F5EE;
+  --gris-osc:#2C2C2A;--gris-med:#5F5E5A;--gris-cla:#F1EFE8;--gris-bor:#D3D1C7;
+  --r:10px;--r-lg:14px;
+}
+body{font-family:'Inter',sans-serif;background:#f0f4f8;color:var(--gris-osc);min-height:100vh}
+
+/* HEADER PÚBLICO */
+.site-hdr{background:var(--azul);padding:0 2rem;height:60px;display:flex;align-items:center;justify-content:space-between}
+.site-logo{display:flex;align-items:center;gap:10px}
+.site-logo-ico{width:32px;height:32px;background:rgba(255,255,255,0.12);border-radius:8px;display:flex;align-items:center;justify-content:center}
+.site-logo-ico svg{width:17px;height:17px;fill:white}
+.site-logo-name{font-family:'Playfair Display',serif;font-size:18px;color:white;font-weight:500}
+.site-logo-tag{font-size:10px;color:rgba(255,255,255,0.55);display:block;margin-top:-2px}
+.site-hdr-right{display:flex;gap:10px;align-items:center}
+.site-hdr-link{color:rgba(255,255,255,0.75);font-size:13px;text-decoration:none}
+.site-hdr-link:hover{color:white}
+
+/* HERO */
+.hero{background:linear-gradient(135deg,#1A4E7A 0%,#2E6FAD 100%);padding:3rem 2rem;text-align:center;color:white}
+.hero-title{font-family:'Playfair Display',serif;font-size:2.2rem;font-weight:600;margin-bottom:.5rem;line-height:1.2}
+.hero-sub{font-size:1rem;color:rgba(255,255,255,0.75);margin-bottom:2rem}
+.hero-badges{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.hero-badge{background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.25);color:white;padding:6px 16px;border-radius:20px;font-size:12.5px}
+
+/* MAIN */
+.page{max-width:820px;margin:0 auto;padding:2rem}
+
+/* STEPS */
+.steps{display:flex;align-items:center;justify-content:center;gap:0;margin-bottom:2rem}
+.step{display:flex;align-items:center;gap:8px}
+.step-num{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;background:var(--gris-bor);color:var(--gris-med);transition:.2s}
+.step-num.active{background:var(--azul);color:white}
+.step-num.done{background:var(--verde);color:white}
+.step-lbl{font-size:12.5px;color:var(--gris-med);font-weight:500}
+.step-lbl.active{color:var(--azul)}
+.step-lbl.done{color:var(--verde)}
+.step-sep{width:40px;height:1px;background:var(--gris-bor);margin:0 4px}
+.step-sep.done{background:var(--verde)}
+
+/* CARD */
+.card{background:white;border-radius:var(--r-lg);border:1px solid var(--gris-bor);box-shadow:0 2px 16px rgba(26,78,122,0.08);overflow:hidden;margin-bottom:1.25rem}
+.card-hdr{padding:1.1rem 1.4rem;border-bottom:1px solid var(--gris-bor)}
+.card-title{font-size:15px;font-weight:500;color:var(--gris-osc)}
+.card-sub{font-size:12.5px;color:var(--gris-med);margin-top:2px}
+
+/* PROFESIONALES */
+.prof-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;padding:1.1rem}
+.prof-card{border:2px solid var(--gris-bor);border-radius:var(--r-lg);padding:1rem;cursor:pointer;transition:.15s;display:flex;align-items:center;gap:12px;background:white}
+.prof-card:hover{border-color:var(--azul);background:var(--azul-pal)}
+.prof-card.selected{border-color:var(--color,var(--azul));background:var(--color-light,var(--azul-pal))}
+.prof-ava{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500;color:white;flex-shrink:0}
+.prof-card-nombre{font-size:13.5px;font-weight:500;color:var(--gris-osc)}
+.prof-card-esp{font-size:11.5px;color:var(--gris-med);margin-top:2px}
+.prof-card-dias{font-size:11px;color:var(--gris-med);margin-top:3px}
+
+/* CALENDARIO */
+.cal{padding:1.1rem}
+.cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem}
+.cal-mes{font-size:15px;font-weight:500}
+.cal-btn{background:none;border:1px solid var(--gris-bor);border-radius:var(--r);padding:5px 14px;cursor:pointer;color:var(--gris-med);font-size:14px}
+.cal-btn:hover{background:var(--gris-cla)}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.cal-dh{font-size:11px;color:var(--gris-med);text-align:center;padding:4px 0;font-weight:500;text-transform:uppercase;letter-spacing:.3px}
+.cal-d{font-size:13px;text-align:center;padding:8px 4px;border-radius:8px;cursor:pointer;border:1.5px solid transparent;transition:.12s;min-height:36px;display:flex;align-items:center;justify-content:center;position:relative}
+.cal-d:hover:not(.disabled):not(.otro-mes){background:var(--azul-pal);color:var(--azul)}
+.cal-d.selected{background:var(--azul);color:white;font-weight:500}
+.cal-d.hoy{border-color:var(--azul);font-weight:500}
+.cal-d.disabled{color:var(--gris-bor);cursor:not-allowed;background:var(--gris-cla)}
+.cal-d.otro-mes{color:var(--gris-bor)}
+.cal-d.tiene-turnos::after{content:'';position:absolute;bottom:3px;left:50%;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:var(--verde)}
+.cal-d.selected.tiene-turnos::after{background:rgba(255,255,255,.7)}
+
+/* SLOTS */
+.slots-titulo{font-size:12px;font-weight:500;color:var(--gris-med);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;padding:0 1.1rem}
+.slots-wrap{padding:0 1.1rem 1.1rem}
+.slots{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
+.slot-btn{padding:9px 6px;border-radius:8px;text-align:center;font-size:13px;cursor:pointer;border:2px solid var(--gris-bor);background:white;font-family:'Inter',sans-serif;transition:.15s;color:var(--gris-osc)}
+.slot-btn:hover{border-color:var(--azul);color:var(--azul);background:var(--azul-pal)}
+.slot-btn.selected{background:var(--azul);color:white;border-color:var(--azul);font-weight:500}
+.slot-btn.ocupado{background:var(--gris-cla);color:var(--gris-bor);cursor:not-allowed;border-color:transparent;text-decoration:line-through}
+.slots-empty{font-size:13px;color:var(--gris-med);text-align:center;padding:1rem}
+
+/* FORM */
+.form-wrap{padding:1.1rem}
+.fg{margin-bottom:.9rem}
+.flbl{font-size:11px;font-weight:500;color:var(--gris-med);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;display:block}
+.finput,.fselect{width:100%;border:1.5px solid var(--gris-bor);border-radius:var(--r);padding:10px 13px;font-size:14px;color:var(--gris-osc);font-family:'Inter',sans-serif;outline:none;transition:border-color .15s}
+.finput:focus,.fselect:focus{border-color:var(--azul-med);box-shadow:0 0 0 3px rgba(26,78,122,0.07)}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+
+/* RESUMEN */
+.resumen{background:var(--azul-pal);border-radius:var(--r);padding:1.1rem;margin-bottom:1rem;font-size:13.5px;border:1px solid rgba(26,78,122,0.12)}
+.res-row{display:flex;gap:8px;margin-bottom:5px}
+.res-k{color:var(--gris-med);min-width:90px}
+.res-v{font-weight:500;color:var(--gris-osc)}
+
+/* CONFIRMACIÓN */
+.conf-box{text-align:center;padding:2.5rem 1.5rem}
+.conf-ico{width:64px;height:64px;border-radius:50%;background:var(--verde-pal);display:flex;align-items:center;justify-content:center;margin:0 auto 1rem}
+.conf-ico svg{width:32px;height:32px}
+.conf-title{font-family:'Playfair Display',serif;font-size:1.5rem;font-weight:600;color:var(--verde);margin-bottom:.5rem}
+.conf-sub{font-size:14px;color:var(--gris-med);line-height:1.6}
+.conf-det{background:var(--gris-cla);border-radius:var(--r-lg);padding:1rem 1.25rem;margin:1.25rem 0;text-align:left}
+
+/* BTN */
+.btn-next{background:var(--azul);border:none;color:white;border-radius:var(--r);padding:11px 28px;font-size:14px;cursor:pointer;font-weight:500;width:100%;font-family:'Inter',sans-serif;transition:.15s;margin-top:.5rem}
+.btn-next:hover{background:var(--azul-med)}
+.btn-next:disabled{background:var(--gris-bor);cursor:not-allowed}
+.btn-back{background:none;border:1.5px solid var(--gris-bor);color:var(--gris-med);border-radius:var(--r);padding:10px 20px;font-size:13px;cursor:pointer;font-family:'Inter',sans-serif;margin-right:8px}
+.btn-back:hover{background:var(--gris-cla)}
+.btn-wa{background:#25D366;border:none;color:white;border-radius:var(--r);padding:11px 28px;font-size:14px;cursor:pointer;font-weight:500;font-family:'Inter',sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:.75rem}
+.btn-wa:hover{background:#1eb857}
+
+/* FOOTER */
+.footer{background:var(--azul);color:rgba(255,255,255,.6);text-align:center;padding:1.5rem;font-size:12.5px;margin-top:2rem}
+.footer strong{color:white}
+
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="site-hdr">
+  <div class="site-logo">
+    <div class="site-logo-ico"><svg viewBox="0 0 20 20"><path d="M10 2C5.6 2 2 5.6 2 10s3.6 8 8 8 8-3.6 8-8-3.6-8-8-8zm0 3c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm0 11.2c-2.7 0-5-1.4-6.4-3.4.1-2.1 4.3-3.3 6.4-3.3 2.1 0 6.3 1.2 6.4 3.3-1.4 2-3.7 3.4-6.4 3.4z"/></svg></div>
+    <div>
+      <div class="site-logo-name">Instituto Espejo</div>
+      <span class="site-logo-tag">Clínica Odontológica 
+� San Rafael, Mendoza</span>
+    </div>
+  </div>
+  <div class="site-hdr-right">
+    <a href="secretaria-standalone.html" class="site-hdr-link">→ Panel secretaría</a>
+  </div>
+</header>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-title">Pedí tu turno online</div>
+  <div class="hero-sub">Elegí el profesional, el día y el horario que mejor te quede</div>
+  <div class="hero-badges">
+    <span class="hero-badge">✓ Confirmación inmediata</span>
+    <span class="hero-badge">✓ Recordatorio por WhatsApp</span>
+    <span class="hero-badge">✓ Sin esperas telefónicas</span>
+  </div>
+</div>
+
+<div class="page">
+
+  <!-- STEPS -->
+  <div class="steps" id="stepsEl">
+    <div class="step"><div class="step-num active" id="sn1">1</div><div class="step-lbl active" id="sl1">Profesional</div></div>
+    <div class="step-sep" id="sep1"></div>
+    <div class="step"><div class="step-num" id="sn2">2</div><div class="step-lbl" id="sl2">Fecha y hora</div></div>
+    <div class="step-sep" id="sep2"></div>
+    <div class="step"><div class="step-num" id="sn3">3</div><div class="step-lbl" id="sl3">Tus datos</div></div>
+    <div class="step-sep" id="sep3"></div>
+    <div class="step"><div class="step-num" id="sn4">4</div><div class="step-lbl" id="sl4">Confirmar</div></div>
+  </div>
+
+  <!-- PASO 1: PROFESIONAL -->
+  <div id="paso1">
+    <div class="card">
+      <div class="card-hdr">
+        <div class="card-title">
+�Con qué profesional querés atenderte?</div>
+        <div class="card-sub">Podés elegir por especialidad</div>
+      </div>
+      <div class="prof-grid" id="profGrid"></div>
+    </div>
+    <button class="btn-next" id="btn1" onclick="irPaso(2)" disabled>Continuar →</button>
+  </div>
+
+  <!-- PASO 2: FECHA Y HORA -->
+  <div id="paso2" class="hidden">
+    <div class="card">
+      <div class="card-hdr">
+        <div class="card-title" id="paso2Title">Elegí día y horario</div>
+        <div class="card-sub" id="paso2Sub"></div>
+      </div>
+      <div class="cal" id="calEl"></div>
+      <div id="slotsSection" class="hidden">
+        <div class="slots-titulo" id="slotsTit">Horarios disponibles</div>
+        <div class="slots-wrap"><div class="slots" id="slotsEl"></div></div>
+      </div>
+    </div>
+    <div style="display:flex;margin-top:.5rem">
+      <button class="btn-back" onclick="irPaso(1)">← Volver</button>
+      <button class="btn-next" id="btn2" onclick="irPaso(3)" disabled style="margin-top:0">Continuar →</button>
+    </div>
+  </div>
+
+  <!-- PASO 3: DATOS PACIENTE -->
+  <div id="paso3" class="hidden">
+    <div class="card">
+      <div class="card-hdr">
+        <div class="card-title">Tus datos</div>
+        <div class="card-sub">Para confirmar el turno y enviarte el recordatorio</div>
+      </div>
+      <div class="form-wrap">
+        <div class="frow">
+          <div class="fg"><label class="flbl">Nombre</label><input class="finput" id="pNombre" placeholder="Tu nombre"></div>
+          <div class="fg"><label class="flbl">Apellido</label><input class="finput" id="pApellido" placeholder="Tu apellido"></div>
+        </div>
+        <div class="frow">
+          <div class="fg"><label class="flbl">Teléfono / WhatsApp</label><input class="finput" id="pTel" placeholder="Ej: 2604123456" type="tel"></div>
+          <div class="fg"><label class="flbl">Email (opcional)</label><input class="finput" id="pEmail" placeholder="tu@email.com" type="email"></div>
+        </div>
+        <div class="fg">
+          <label class="flbl">Tratamiento / Motivo de consulta</label>
+          <select class="fselect" id="pServicio"></select>
+        </div>
+        <div class="fg">
+          <label class="flbl">Obra social / Particular</label>
+          <select class="fselect" id="pObraSocial">
+            <option>Particular</option>
+            <option>OSDE</option>
+            <option>Swiss Medical</option>
+            <option>OSPAC</option>
+            <option>PAMI</option>
+            <option>Provincia ART</option>
+            <option>Otra</option>
+          </select>
+        </div>
+        <div style="background:#FFF3CD;border-radius:var(--r);padding:.85rem;font-size:13px;color:#633806;border:1px solid rgba(186,117,23,.2)">
+          <strong>Importante:</strong> Tu turno quedará pendiente de confirmación. La secretaría lo confirmará en breve y te avisaremos por WhatsApp.
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;margin-top:.5rem">
+      <button class="btn-back" onclick="irPaso(2)">← Volver</button>
+      <button class="btn-next" style="margin-top:0" onclick="confirmarPedido()">Confirmar pedido de turno →</button>
+    </div>
+  </div>
+
+  <!-- PASO 4: CONFIRMACIÓN -->
+  <div id="paso4" class="hidden">
+    <div class="card">
+      <div class="conf-box">
+        <div class="conf-ico">
+          <svg viewBox="0 0 20 20" fill="none" stroke="#1D9E75" stroke-width="2"><path d="M4 10l4 4 8-8"/></svg>
+        </div>
+        <div class="conf-title">
+�Pedido enviado!</div>
+        <div class="conf-sub">Tu solicitud fue recibida. La secretaría de Instituto Espejo la revisará y te confirmará por WhatsApp.</div>
+        <div class="conf-det" id="confDet"></div>
+        <button class="btn-wa" onclick="abrirWA()">
+          <svg width="16" height="16" viewBox="0 0 20 20" fill="white"><path d="M10 1C5 1 1 5 1 10c0 1.8.5 3.4 1.3 4.8L1 19l4.3-1.3A9 9 0 1 0 10 1z"/></svg>
+          Consultar por WhatsApp
+        </button>
+        <button class="btn-next" onclick="reiniciar()" style="margin-top:.75rem;background:var(--gris-cla);color:var(--gris-osc)">Pedir otro turno</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<footer class="footer">
+  <strong>Instituto Espejo</strong> 
+� Clínica Odontológica 
+� San Rafael, Mendoza<br>
+  📞 Consultas: 2604 000 000 
+� 🕐 Lun–Sáb 8:00–18:00
+</footer>
+
+<script>
+const { PROFESIONALES, SERVICIOS, TURNOS, generarSlots, agregarTurno } = window.IE;
+const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const MESES_MIN = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const DIAS = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+
+let sel = { profId:null, fecha:null, hora:null };
+let calOffset = 0;
+const BASE = new Date('2025-06-01T00:00:00');
+
+function fechaStr(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function prof(id){ return PROFESIONALES.find(p=>p.id===id); }
+
+// PASO 1 — PROFESIONALES
+function renderProfGrid(){
+  const el=document.getElementById('profGrid');
+  el.innerHTML=PROFESIONALES.map(p=>{
+    const diasNom=p.dias.map(d=>['Do','Lu','Ma','Mi','Ju','Vi','Sá'][d]).join(' ');
+    return `<div class="prof-card" id="pc-${p.id}" style="--color:${p.color};--color-light:${p.colorLight}" onclick="selProf('${p.id}')">
+      <div class="prof-ava" style="background:${p.color}">${p.iniciales}</div>
+      <div>
+        <div class="prof-card-nombre">${p.nombre}</div>
+        <div class="prof-card-esp">${p.especialidad}</div>
+        <div class="prof-card-dias">${diasNom} 
+� ${p.horaInicio}–${p.horaFin}hs</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function selProf(id){
+  sel.profId=id; sel.fecha=null; sel.hora=null;
+  document.querySelectorAll('.prof-card').forEach(c=>c.classList.remove('selected'));
+  document.getElementById('pc-'+id).classList.add('selected');
+  document.getElementById('btn1').disabled=false;
+}
+
+// PASO 2 — CALENDARIO
+function renderCal(){
+  const p=prof(sel.profId);
+  document.getElementById('paso2Title').textContent=`Elegí día con ${p.nombre}`;
+  document.getElementById('paso2Sub').textContent=`${p.especialidad} 
+� Turnos cada ${p.duracionTurno} min`;
+
+  const mes=new Date(BASE.getFullYear(), BASE.getMonth()+calOffset, 1);
+  const el=document.getElementById('calEl');
+  const primerDow=(mes.getDay()+6)%7;
+  const ultDia=new Date(mes.getFullYear(),mes.getMonth()+1,0).getDate();
+  const hoy=new Date('2025-06-16T00:00:00');
+
+  let html=`<div class="cal-nav">
+    <button class="cal-btn" onclick="cambiarMes(-1)">‹</button>
+    <span class="cal-mes">${MESES[mes.getMonth()]} ${mes.getFullYear()}</span>
+    <button class="cal-btn" onclick="cambiarMes(1)">›</button>
+  </div>
+  <div class="cal-grid">
+    <div class="cal-dh">Lu</div><div class="cal-dh">Ma</div><div class="cal-dh">Mi</div><div class="cal-dh">Ju</div><div class="cal-dh">Vi</div><div class="cal-dh">Sá</div><div class="cal-dh">Do</div>`;
+  for(let i=0;i<primerDow;i++) html+='<div class="cal-d otro-mes"></div>';
+  for(let d=1;d<=ultDia;d++){
+    const fd=new Date(mes.getFullYear(),mes.getMonth(),d);
+    const fStr=fechaStr(fd);
+    const dow=fd.getDay();
+    const trabaja=p.dias.includes(dow);
+    const pasado=fd<hoy;
+    const esHoy=fStr===fechaStr(hoy);
+    const esSel=fStr===sel.fecha;
+    const slots=trabaja&&!pasado?generarSlots(p.id,fStr):[];
+    const libres=slots.filter(s=>s.disponible).length;
+    const cls=[
+      'cal-d',
+      esSel?'selected':'',
+      esHoy&&!esSel?'hoy':'',
+      (!trabaja||pasado)?'disabled':'',
+      libres&&!esSel?'tiene-turnos':''
+    ].filter(Boolean).join(' ');
+    html+=`<div class="${cls}" onclick="${trabaja&&!pasado?`selFecha('${fStr}')`:''}">${d}</div>`;
+  }
+  html+='</div>';
+  el.innerHTML=html;
+}
+
+function selFecha(f){
+  sel.fecha=f; sel.hora=null;
+  document.getElementById('btn2').disabled=true;
+  renderCal();
+  renderSlots();
+}
+
+function renderSlots(){
+  const p=prof(sel.profId);
+  const slots=generarSlots(p.id,sel.fecha);
+  const libres=slots.filter(s=>s.disponible);
+  const sec=document.getElementById('slotsSection');
+  const d=new Date(sel.fecha+'T00:00:00');
+  document.getElementById('slotsTit').textContent=`Horarios — ${DIAS[d.getDay()]} ${d.getDate()} de ${MESES_MIN[d.getMonth()]}`;
+  sec.classList.remove('hidden');
+  const el=document.getElementById('slotsEl');
+  if(!slots.length){el.innerHTML='<div class="slots-empty">Sin disponibilidad para este día</div>';return;}
+  el.innerHTML=slots.map(s=>`<button class="slot-btn${!s.disponible?' ocupado':''}${s.hora===sel.hora?' selected':''}" onclick="${s.disponible?`selSlot('${s.hora}')`:''}" ${!s.disponible?'disabled':''}>${s.hora}</button>`).join('');
+}
+
+function selSlot(h){
+  sel.hora=h;
+  renderSlots();
+  document.getElementById('btn2').disabled=false;
+}
+
+function cambiarMes(d){
+  calOffset+=d;
+  sel.fecha=null; sel.hora=null;
+  document.getElementById('btn2').disabled=true;
+  document.getElementById('slotsSection').classList.add('hidden');
+  renderCal();
+}
+
+// PASO 3 — DATOS
+function renderServicios(){
+  const el=document.getElementById('pServicio');
+  const p=prof(sel.profId);
+  el.innerHTML=SERVICIOS.map(s=>`<option>${s}</option>`).join('');
+}
+
+// CONFIRMACIÓN
+function confirmarPedido(){
+  const nombre=document.getElementById('pNombre').value.trim();
+  const apellido=document.getElementById('pApellido').value.trim();
+  const tel=document.getElementById('pTel').value.trim();
+  if(!nombre||!tel){alert('Completá al menos tu nombre y teléfono.');return;}
+  const p=prof(sel.profId);
+  const t=agregarTurno({
+    profesionalId:sel.profId,
+    paciente:`${nombre} ${apellido}`.trim(),
+    tel,
+    fecha:sel.fecha,
+    hora:sel.hora,
+    servicio:document.getElementById('pServicio').value,
+    estado:'pendiente',
+    origen:'online',
+    notas:''
+  });
+  const d=new Date(sel.fecha+'T00:00:00');
+  document.getElementById('confDet').innerHTML=`
+    <div style="display:grid;gap:6px;font-size:13.5px">
+      <div class="res-row"><span class="res-k">Paciente</span><span class="res-v">${t.paciente}</span></div>
+      <div class="res-row"><span class="res-k">Profesional</span><span class="res-v">${p.nombre}</span></div>
+      <div class="res-row"><span class="res-k">Especialidad</span><span class="res-v">${p.especialidad}</span></div>
+      <div class="res-row"><span class="res-k">Fecha</span><span class="res-v">${d.getDate()} de ${MESES_MIN[d.getMonth()]} ${d.getFullYear()}</span></div>
+      <div class="res-row"><span class="res-k">Horario</span><span class="res-v">${sel.hora} hs</span></div>
+      <div class="res-row"><span class="res-k">Servicio</span><span class="res-v">${t.servicio}</span></div>
+      <div class="res-row"><span class="res-k">Estado</span><span class="res-v" style="color:var(--ambar)">⏳ Pendiente de confirmación</span></div>
+    </div>
+  `;
+  irPaso(4);
+}
+
+function abrirWA(){
+  window.open('https://wa.me/5492604000000?text=Hola%2C+quiero+consultar+sobre+un+turno+que+pedí+en+la+web.','_blank');
+}
+
+function reiniciar(){
+  sel={profId:null,fecha:null,hora:null};
+  calOffset=0;
+  irPaso(1);
+  document.getElementById('pNombre').value='';
+  document.getElementById('pApellido').value='';
+  document.getElementById('pTel').value='';
+  document.getElementById('pEmail').value='';
+}
+
+// PASOS
+function irPaso(n){
+  [1,2,3,4].forEach(i=>{
+    document.getElementById('paso'+i).classList.toggle('hidden',i!==n);
+    const sn=document.getElementById('sn'+i);
+    const sl=document.getElementById('sl'+i);
+    if(!sn||!sl)return;
+    if(i<n){sn.className='step-num done';sn.textContent='✓';sl.className='step-lbl done';}
+    else if(i===n){sn.className='step-num active';sl.className='step-lbl active';}
+    else{sn.className='step-num';sn.textContent=i;sl.className='step-lbl';}
+    const sep=document.getElementById('sep'+i);
+    if(sep) sep.className='step-sep'+(i<n?' done':'');
+  });
+  if(n===2){ renderCal(); }
+  if(n===3){ renderServicios(); }
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+renderProfGrid();
+</script>
+</body>
+</html>
