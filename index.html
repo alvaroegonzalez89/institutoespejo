@@ -28,6 +28,20 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
+// Exponer Firebase al scope global para que funcionen los window._
+window._db = db;
+window._collection = collection;
+window._doc = doc;
+window._addDoc = addDoc;
+window._updateDoc = updateDoc;
+window._deleteDoc = deleteDoc;
+window._query = query;
+window._where = where;
+window._orderBy = orderBy;
+window._onSnapshot = onSnapshot;
+window._serverTimestamp = serverTimestamp;
+window._getDocs = getDocs;
+
 // ══════════════════════════════════════════════
 //  DATOS PROFESIONALES
 // ══════════════════════════════════════════════
@@ -193,6 +207,13 @@ const TEL_CLINICA = '2604396462';
 
 // Estado global
 let profs = [...PROFESIONALES_INIT];
+let ausencias = {}; // { 'profId': Set(['2025-07-15', '2025-07-16', ...]) }
+PROFESIONALES_INIT.forEach(p => { ausencias[p.id] = new Set(); });
+
+// Verifica si un prof tiene ausencia en una fecha
+function tieneAusencia(profId, fecha) {
+  return ausencias[profId]?.has(fecha) || false;
+}
 let turnos = [];       // se llena desde Firestore
 let pacientes = [];    // se llena desde Firestore
 let profSelAgenda = 'todos';
@@ -234,6 +255,8 @@ function generarSlots(profId, fecha, incluirOcupados=true) {
   const p = gProf(profId); if(!p) return [];
   const d = new Date(fecha+'T00:00:00');
   const dow = d.getDay();
+  // Verificar ausencia
+  if(tieneAusencia(profId, fecha)) return [];
   const franjas = p.horarios.filter(h=>h.dia===dow);
   if(!franjas.length) return [];
   const slots = [];
@@ -305,7 +328,7 @@ function mostrarApp() {
 // ══════════════════════════════════════════════
 function iniciarListeners() {
   // Turnos en tiempo real
-  const qT = query(collection(db,'turnos'), orderBy('fecha'), orderBy('hora'));
+  const qT = query(window._collection(window._db,'turnos'), orderBy('fecha'), orderBy('hora'));
   unsubTurnos = onSnapshot(qT, snap => {
     turnos = snap.docs.map(d=>({...d.data(), id: d.id}));
     renderAgenda();
@@ -315,7 +338,7 @@ function iniciarListeners() {
     if(document.getElementById('vDoc').style.display!=='none') renderVistaMedico();
   });
   // Pacientes en tiempo real
-  const qP = query(collection(db,'pacientes'), orderBy('apellido'));
+  const qP = query(window._collection(window._db,'pacientes'), orderBy('apellido'));
   unsubPacientes = onSnapshot(qP, snap => {
     pacientes = snap.docs.map(d=>({...d.data(), id: d.id}));
   });
@@ -352,9 +375,9 @@ window._guardarTurno = async function() {
     if(existing) {
       pacId = existing.id;
     } else {
-      const ref = await addDoc(collection(db,'pacientes'), {
+      const ref = await window._addDoc(window._collection(window._db,'pacientes'), {
         nombre, apellido, dni: dni||'', telefono: tel||'',
-        creadoEn: serverTimestamp()
+        creadoEn: window._serverTimestamp()
       });
       pacId = ref.id;
     }
@@ -369,14 +392,14 @@ window._guardarTurno = async function() {
     estado: 'confirmado',
     esSobreturno: esSobre,
     nota,
-    creadoEn: serverTimestamp()
+    creadoEn: window._serverTimestamp()
   };
 
   if(turnoEditando) {
-    await updateDoc(doc(db,'turnos',turnoEditando), data);
+    await window._updateDoc(window._doc(window._db,'turnos',turnoEditando), data);
     toast('Turno actualizado','ok');
   } else {
-    await addDoc(collection(db,'turnos'), data);
+    await window._addDoc(window._collection(window._db,'turnos'), data);
     toast('Turno guardado','ok');
   }
   cerrarModal('modalNuevo');
@@ -384,13 +407,13 @@ window._guardarTurno = async function() {
 };
 
 window._cancelarTurno = async function(id, motivo='') {
-  await updateDoc(doc(db,'turnos',id), { estado:'cancelado', motivoCancelacion: motivo });
+  await window._updateDoc(window._doc(window._db,'turnos',id), { estado:'cancelado', motivoCancelacion: motivo });
   toast('Turno cancelado','ok');
   cerrarModal('modalDet');
 };
 
 window._confirmarTurno = async function(id) {
-  await updateDoc(doc(db,'turnos',id), { estado:'confirmado' });
+  await window._updateDoc(window._doc(window._db,'turnos',id), { estado:'confirmado' });
   toast('Turno confirmado','ok');
 };
 
@@ -556,20 +579,39 @@ function actualizarBadges() {
   const HOY = hoyStr();
   const manana = new Date(); manana.setDate(manana.getDate()+1);
   const mStr = fStr(manana);
-  document.getElementById('statHoy').textContent = turnos.filter(t=>t.fecha===HOY&&t.estado!=='cancelado').length;
-  document.getElementById('statManana').textContent = turnos.filter(t=>t.fecha===mStr&&t.estado!=='cancelado').length;
+  const hoyTs = turnos.filter(t=>t.fecha===HOY);
+  const conf = hoyTs.filter(t=>t.estado==='confirmado').length;
+  const aten = hoyTs.filter(t=>t.estado==='atendido').length;
+  const canc = hoyTs.filter(t=>t.estado==='cancelado').length;
+  const sobre = hoyTs.filter(t=>t.esSobreturno&&t.estado!=='cancelado').length;
+  const total = hoyTs.filter(t=>t.estado!=='cancelado').length;
+  const manTs = turnos.filter(t=>t.fecha===mStr&&t.estado!=='cancelado').length;
+  // sidebar stats
+  document.getElementById('statHoy').textContent = total;
+  document.getElementById('statManana').textContent = manTs;
   document.getElementById('statSem').textContent = (() => {
     let cnt=0;
     for(let i=0;i<6;i++){const d=getLunes();d.setDate(d.getDate()+i);cnt+=turnos.filter(t=>t.fecha===fStr(d)&&t.estado!=='cancelado').length;}
     return cnt;
   })();
+  // resumen bar
+  const rb = id => document.getElementById(id);
+  if(rb('rbTotal')) {
+    rb('rbTotal').textContent = total;
+    rb('rbConf').textContent = conf;
+    rb('rbAten').textContent = aten;
+    rb('rbCanc').textContent = canc;
+    rb('rbSobre').textContent = sobre;
+    rb('rbMan').textContent = manTs;
+  }
 }
 
 // ══════════════════════════════════════════════
 //  MODAL NUEVO TURNO
 // ══════════════════════════════════════════════
 window._celdaClick = function(fecha, hora) {
-  abrirModalNuevo(fecha, hora);
+  // Pre-seleccionar el profesional activo en el filtro
+  abrirModalNuevo(fecha, hora, profSelAgenda !== 'todos' ? profSelAgenda : null);
 };
 window._abrirNuevo = function() { abrirModalNuevo(); };
 
@@ -692,7 +734,7 @@ window._verDetalle = async function(id) {
 
 window._guardarNota = async function(id) {
   const nota=document.getElementById('detNota').value.trim();
-  await updateDoc(doc(db,'turnos',id),{nota});
+  await window._updateDoc(window._doc(window._db,'turnos',id),{nota});
   toast('Nota guardada','ok');
 };
 
@@ -817,18 +859,109 @@ function renderDocSlots() {
 // ══════════════════════════════════════════════
 function renderGestion() {
   const el=document.getElementById('gestionList');
-  el.innerHTML=profs.map(p=>`
-    <div class="gestion-row">
-      <div class="prof-ava-sm" style="background:${p.color}">${p.ini}</div>
+  el.innerHTML=profs.map(p=>{
+    const ausSet = ausencias[p.id] || new Set();
+    const ausArr = [...ausSet].sort().slice(0,5);
+    return `<div class="gestion-row" style="align-items:flex-start;padding:1rem">
+      <div class="prof-ava-sm" style="background:${p.color};margin-top:2px">${p.ini}</div>
       <div style="flex:1">
         <div style="font-size:13.5px;font-weight:500">${p.apellido}${p.nombre?', '+p.nombre:''}</div>
-        <div style="font-size:11.5px;color:var(--gm)">${p.esp} · Turno cada ${p.dur} min</div>
-        <div style="font-size:11px;color:var(--gm);margin-top:2px">${p.horarios.map(h=>`${DIAS_N[h.dia]} ${h.desde}–${h.hasta}`).join(' | ')}</div>
+        <div style="font-size:11.5px;color:var(--gm);margin-top:1px">${p.esp} · Turno cada ${p.dur} min</div>
+        <div style="font-size:11px;color:var(--gm);margin-top:3px;line-height:1.8">${p.horarios.map(h=>`${DIAS_N[h.dia]} ${h.desde}–${h.hasta}`).join(' &nbsp;|&nbsp; ')}</div>
+        ${ausArr.length?`<div style="margin-top:6px;display:flex;gap:5px;flex-wrap:wrap">
+          <span style="font-size:10px;color:var(--gm);font-weight:500">Ausencias:</span>
+          ${ausArr.map(f=>`<span style="font-size:11px;background:var(--rojo-p);color:var(--rojo);padding:2px 8px;border-radius:12px;border:1px solid rgba(226,75,74,.2)">${labelF(f)} <button onclick="_quitarAusencia('${p.id}','${f}')" style="background:none;border:none;cursor:pointer;color:var(--rojo);font-size:11px;padding:0;margin-left:2px">×</button></span>`).join('')}
+          ${ausSet.size>5?`<span style="font-size:11px;color:var(--gm)">+${ausSet.size-5} más</span>`:''}
+        </div>`:''}
       </div>
-      <button class="btn-sec" style="font-size:12px" onclick="_editarProf('${p.id}')">✏️ Editar</button>
-    </div>
-  `).join('');
+      <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;margin-left:10px">
+        <button class="btn-sec" style="font-size:12px" onclick="_editarProf('${p.id}')">✏️ Editar horarios</button>
+        <button class="btn-sec" style="font-size:12px;color:var(--rojo)" onclick="_abrirAusencias('${p.id}')">📅 Marcar ausencias</button>
+      </div>
+    </div>`;
+  }).join('');
 }
+
+// ── AUSENCIAS ────────────────────────────────────────────────
+let profAusenciaActual = null;
+let ausenciaCalOffset = 0;
+
+window._abrirAusencias = function(profId) {
+  profAusenciaActual = profId;
+  ausenciaCalOffset = 0;
+  const p = gProf(profId);
+  document.getElementById('ausTitle').textContent = `Ausencias · ${p.apellido}${p.nombre?', '+p.nombre:''}`;
+  renderAusenciaCal();
+  abrirModal('modalAusencias');
+};
+
+function renderAusenciaCal() {
+  const p = gProf(profAusenciaActual);
+  const ausSet = ausencias[profAusenciaActual] || new Set();
+  const hoy = new Date();
+  const mes = new Date(hoy.getFullYear(), hoy.getMonth() + ausenciaCalOffset, 1);
+  const ultDia = new Date(mes.getFullYear(), mes.getMonth()+1, 0).getDate();
+  const primerDow = (mes.getDay()+6)%7;
+  const HOY = fStr(hoy);
+
+  document.getElementById('ausCalTit').textContent = `${MESES_M[mes.getMonth()]} ${mes.getFullYear()}`;
+
+  let html = '';
+  ['Lu','Ma','Mi','Ju','Vi','Sá','Do'].forEach(d=>{ html+=`<div style="font-size:10px;text-align:center;color:var(--gm);font-weight:500;padding:3px 0">${d}</div>`; });
+  for(let i=0;i<primerDow;i++) html+='<div></div>';
+
+  for(let d=1;d<=ultDia;d++){
+    const fd = new Date(mes.getFullYear(), mes.getMonth(), d);
+    const fs = fStr(fd);
+    const dow = fd.getDay();
+    const trabaja = p.horarios.some(h=>h.dia===dow);
+    const esAusente = ausSet.has(fs);
+    const esHoy = fs===HOY;
+    const pasado = fd < hoy && !esHoy;
+
+    let cls = 'aus-dia';
+    let style = '';
+    if(esAusente) { cls+=' ausente'; style='background:var(--rojo);color:white;border-color:var(--rojo)'; }
+    else if(!trabaja) { cls+=' no-trabaja'; style='color:var(--bor);background:var(--gc)'; }
+    else if(pasado) { style='color:var(--gm)'; }
+    else if(esHoy) { style='border-color:var(--azul);font-weight:600'; }
+    else { style=`border-color:${p.color};color:${p.color};background:${p.light}`; }
+
+    const clickable = trabaja && !pasado;
+    html+=`<div class="aus-dia" style="${style};${!clickable?'cursor:default;opacity:.5':''}" 
+      onclick="${clickable?`_toggleAusencia('${fs}')`:''}"
+      title="${esAusente?'Ausente':(trabaja?'Trabaja':'No trabaja')}">${d}${esAusente?'<br><span style="font-size:7px">✕</span>':''}</div>`;
+  }
+
+  document.getElementById('ausCalGrid').innerHTML = html;
+
+  // Lista de ausencias marcadas
+  const futuras = [...ausSet].filter(f=>f>=fStr(hoy)).sort();
+  document.getElementById('ausLista').innerHTML = futuras.length
+    ? futuras.map(f=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--bor)">
+        <span style="font-size:13px">${labelF(f)}</span>
+        <button onclick="_quitarAusencia('${profAusenciaActual}','${f}')" style="background:none;border:none;cursor:pointer;color:var(--rojo);font-size:13px">✕ Quitar</button>
+      </div>`).join('')
+    : '<div style="font-size:12.5px;color:var(--gm);padding:.5rem 0">Sin ausencias marcadas</div>';
+}
+
+window._toggleAusencia = function(fecha) {
+  const ausSet = ausencias[profAusenciaActual];
+  if(ausSet.has(fecha)) ausSet.delete(fecha);
+  else ausSet.add(fecha);
+  renderAusenciaCal();
+  renderGestion();
+  renderAgenda();
+  // En producción: guardar en Firestore
+  // updateDoc(window._doc(window._db,'profesionales',profAusenciaActual), { ausencias: [...ausSet] });
+};
+
+window._quitarAusencia = function(profId, fecha) {
+  ausencias[profId]?.delete(fecha);
+  renderAusenciaCal();
+  renderGestion();
+  renderAgenda();
+};
 
 window._editarProf = function(id) {
   const p=gProf(id); if(!p) return;
@@ -893,7 +1026,7 @@ window._guardarProf = function() {
   renderGestion();
   toast('Profesional actualizado','ok');
   // En producción: guardar en Firestore
-  // setDoc(doc(db,'profesionales',id), profs[idx]);
+  // setDoc(window._doc(window._db,'profesionales',id), profs[idx]);
 };
 
 // ══════════════════════════════════════════════
@@ -1091,7 +1224,7 @@ window._verFicha = function(pacId) {
 window._agregarNota = function(turnoId, pacId) {
   const nota = prompt('Nota clínica para este turno:');
   if(nota !== null) {
-    updateDoc(doc(db,'turnos',turnoId), { nota }).then(()=>{
+    updateDoc(window._doc(window._db,'turnos',turnoId), { nota }).then(()=>{
       toast('Nota guardada','ok');
       setTimeout(()=>_verFicha(pacId), 500);
     });
@@ -1100,7 +1233,7 @@ window._agregarNota = function(turnoId, pacId) {
 
 window._guardarNotaGeneral = async function(pacId) {
   const nota = document.getElementById('fichaNotaGen').value.trim();
-  await updateDoc(doc(db,'pacientes',pacId), { notaGeneral: nota });
+  await window._updateDoc(window._doc(window._db,'pacientes',pacId), { notaGeneral: nota });
   toast('Nota guardada','ok');
 };
 
@@ -1143,11 +1276,11 @@ window._guardarPaciente = async function() {
     antecedentes: document.getElementById('npacAnte').value.trim(),
   };
   if(id) {
-    await updateDoc(doc(db,'pacientes',id), data);
+    await window._updateDoc(window._doc(window._db,'pacientes',id), data);
     toast('Paciente actualizado','ok');
   } else {
-    data.creadoEn = serverTimestamp();
-    await addDoc(collection(db,'pacientes'), data);
+    data.creadoEn = window._serverTimestamp();
+    await window._addDoc(window._collection(window._db,'pacientes'), data);
     toast('Paciente creado','ok');
   }
   cerrarModal('modalNuevoPac');
@@ -1376,7 +1509,12 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
 /* ── MISC ── */
 .empty-msg{padding:1.5rem;text-align:center;font-size:13px;color:var(--gm)}
 .ml-auto{margin-left:auto}
+.stat-bar-item{display:flex;align-items:center;gap:8px;background:white;border:1px solid var(--bor);border-radius:var(--r);padding:6px 14px;min-width:0}
+.sbi-val{font-size:20px;font-weight:600;line-height:1;white-space:nowrap;color:var(--azul)}
+.sbi-lbl{font-size:10.5px;color:var(--gm);white-space:nowrap}
 .hidden{display:none!important}
+.aus-dia{font-size:12px;text-align:center;padding:6px 2px;border-radius:7px;cursor:pointer;border:1.5px solid var(--bor);background:white;transition:.1s;min-height:32px;line-height:1.2}
+.aus-dia:hover:not(.no-trabaja){filter:brightness(.9)}
 .toast{position:fixed;bottom:1.5rem;right:1.5rem;background:var(--go);color:white;padding:10px 17px;border-radius:var(--r);font-size:13px;z-index:500;display:none;align-items:center;gap:8px;box-shadow:0 8px 24px rgba(0,0,0,.2);max-width:340px}
 .toast.show{display:flex;animation:tIn .25s ease}
 .toast.wa{border-left:4px solid #25D366}
@@ -1434,6 +1572,34 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
 
       <!-- Centro: agenda -->
       <main class="main-center">
+        <!-- Resumen compacto -->
+        <div id="resumenBar" style="display:flex;gap:8px;margin-bottom:.75rem;flex-wrap:wrap">
+          <div class="stat-bar-item" id="rb-total" style="background:var(--azul-p);border-color:rgba(26,78,122,.15)">
+            <span class="sbi-val" id="rbTotal">0</span>
+            <span class="sbi-lbl">Hoy</span>
+          </div>
+          <div class="stat-bar-item" id="rb-conf" style="background:var(--verde-p);border-color:rgba(29,158,117,.2)">
+            <span class="sbi-val" id="rbConf" style="color:var(--verde)">0</span>
+            <span class="sbi-lbl">Confirmados</span>
+          </div>
+          <div class="stat-bar-item" id="rb-aten" style="background:#EEF9F5;border-color:rgba(29,158,117,.15)">
+            <span class="sbi-val" id="rbAten" style="color:#0F6E56">0</span>
+            <span class="sbi-lbl">Atendidos</span>
+          </div>
+          <div class="stat-bar-item" id="rb-canc" style="background:var(--rojo-p);border-color:rgba(226,75,74,.2)">
+            <span class="sbi-val" id="rbCanc" style="color:var(--rojo)">0</span>
+            <span class="sbi-lbl">Cancelados</span>
+          </div>
+          <div class="stat-bar-item" id="rb-sobre" style="background:#FFF5F5;border-color:rgba(226,75,74,.3)">
+            <span class="sbi-val" id="rbSobre" style="color:var(--rojo)">0</span>
+            <span class="sbi-lbl">Sobreturnos</span>
+          </div>
+          <div class="stat-bar-item" id="rb-man" style="background:#dcf8c6;border-color:rgba(37,211,102,.3)" style="margin-left:auto">
+            <span class="sbi-val" id="rbMan" style="color:#0F6E56">0</span>
+            <span class="sbi-lbl">Mañana</span>
+          </div>
+        </div>
+
         <!-- Toolbar -->
         <div class="toolbar">
           <div class="week-nav-wrap">
@@ -1507,7 +1673,7 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
         </div>
         <div class="ml-auto"></div>
         <div style="font-size:12px;color:var(--gm)">Turnos hoy: <strong id="docStatHoy">—</strong></div>
-        <button class="btn-primary" onclick="_abrirNuevo()">+ Nuevo turno</button>
+        <button class="btn-primary" onclick="abrirModalNuevo('',null,profSelDoc)">+ Nuevo turno</button>
       </div>
       <!-- Selector profesional -->
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:1.25rem;padding-bottom:1rem;border-bottom:1px solid var(--bor)" id="docPills"></div>
@@ -1684,6 +1850,40 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
     <div class="modal-footer">
       <button class="btn-sec" onclick="cerrarModal('modalNuevoPac')">Cancelar</button>
       <button class="btn-primary" onclick="_guardarPaciente()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- MODAL AUSENCIAS -->
+<div class="overlay" id="modalAusencias">
+  <div class="modal" style="width:560px;max-width:96vw">
+    <div class="modal-hdr">
+      <span class="modal-title" id="ausTitle">Ausencias</span>
+      <button class="modal-close" onclick="cerrarModal('modalAusencias')">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--gm);margin-bottom:1rem">Tocá los días para marcarlos como ausencia. Los días en rojo quedan bloqueados en la agenda.</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem">
+        <!-- Calendario -->
+        <div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
+            <button class="mc-nav-btn" onclick="ausenciaCalOffset--;renderAusenciaCal()">‹</button>
+            <span style="font-size:13px;font-weight:500" id="ausCalTit"></span>
+            <button class="mc-nav-btn" onclick="ausenciaCalOffset++;renderAusenciaCal()">›</button>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px" id="ausCalGrid"></div>
+        </div>
+        <!-- Lista ausencias marcadas -->
+        <div>
+          <div style="font-size:11px;font-weight:600;color:var(--gm);text-transform:uppercase;letter-spacing:.5px;margin-bottom:.6rem">Ausencias marcadas</div>
+          <div id="ausLista"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-sec" onclick="cerrarModal('modalAusencias')">Cerrar</button>
+      <button class="btn-primary" onclick="cerrarModal('modalAusencias');toast('Ausencias guardadas','ok')">Confirmar</button>
     </div>
   </div>
 </div>
