@@ -1,0 +1,1425 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Instituto Espejo — Gestión de Turnos</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet">
+
+<!-- Firebase SDKs -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, doc, setDoc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+// ══════════════════════════════════════════════
+//  FIREBASE CONFIG — reemplazar con tus credenciales
+// ══════════════════════════════════════════════
+const firebaseConfig = {
+  apiKey: "AIzaSyCSd5HEc51AWa7CLfz_qePVV-y5SsM7-vA",
+  authDomain: "instituto-espejo.firebaseapp.com",
+  projectId: "instituto-espejo",
+  storageBucket: "instituto-espejo.firebasestorage.app",
+  messagingSenderId: "242012179287",
+  appId: "1:242012179287:web:de2faee7b0572d94e68c12"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+
+// ══════════════════════════════════════════════
+//  DATOS PROFESIONALES
+// ══════════════════════════════════════════════
+const PROFESIONALES_INIT = [
+  {
+    id: 'caro', apellido: 'Caro', nombre: 'Raúl Alejandro', esp: 'Odontología',
+    color: '#1A4E7A', light: '#EBF3FB', ini: 'RC', dur: 45,
+    horarios: [
+      { dia: 1, desde: '16:15', hasta: '20:00' }, // lunes
+      { dia: 2, desde: '08:00', hasta: '11:00' }, // martes
+      { dia: 3, desde: '08:00', hasta: '11:00' }, // miércoles
+      { dia: 3, desde: '16:15', hasta: '20:00' },
+      { dia: 4, desde: '16:15', hasta: '20:00' }, // jueves
+      { dia: 5, desde: '16:15', hasta: '20:00' }, // viernes
+    ]
+  },
+  {
+    id: 'castan', apellido: 'Castán', nombre: 'María Verónica', esp: 'Odontología',
+    color: '#1D9E75', light: '#E1F5EE', ini: 'MC', dur: 30,
+    horarios: [
+      { dia: 1, desde: '16:30', hasta: '18:30' },
+      { dia: 2, desde: '16:30', hasta: '18:30' },
+      { dia: 3, desde: '08:30', hasta: '10:00' },
+      { dia: 4, desde: '08:30', hasta: '11:30' },
+      { dia: 4, desde: '16:30', hasta: '18:30' },
+      { dia: 5, desde: '16:30', hasta: '18:30' },
+    ]
+  },
+  {
+    id: 'fernandez', apellido: 'Fernández', nombre: 'Carolina', esp: 'Odontología',
+    color: '#BA7517', light: '#FAEEDA', ini: 'CF', dur: 30,
+    horarios: [
+      { dia: 1, desde: '09:00', hasta: '12:00' },
+      { dia: 2, desde: '13:00', hasta: '17:00' },
+      { dia: 3, desde: '09:00', hasta: '12:00' },
+      { dia: 4, desde: '10:00', hasta: '15:00' },
+      { dia: 5, desde: '14:30', hasta: '19:00' },
+    ]
+  },
+  {
+    id: 'figueroa', apellido: 'Figueroa', nombre: 'Mariana', esp: 'Odontología',
+    color: '#993556', light: '#FBEAF0', ini: 'MF', dur: 60,
+    horarios: [
+      { dia: 1, desde: '15:00', hasta: '19:00' },
+      { dia: 2, desde: '15:00', hasta: '19:00' },
+      { dia: 3, desde: '15:00', hasta: '19:00' },
+      { dia: 4, desde: '15:00', hasta: '19:00' },
+      { dia: 5, desde: '15:00', hasta: '19:00' },
+    ]
+  },
+  {
+    id: 'gatica', apellido: 'Gatica', nombre: 'Gabriela', esp: 'Odontología',
+    color: '#2E86AB', light: '#E3F4FB', ini: 'GG', dur: 30,
+    horarios: [
+      { dia: 1, desde: '10:30', hasta: '12:30' },
+      { dia: 2, desde: '10:30', hasta: '12:30' },
+      { dia: 3, desde: '11:30', hasta: '12:30' },
+      { dia: 3, desde: '16:30', hasta: '19:30' },
+      { dia: 4, desde: '10:30', hasta: '12:30' },
+      { dia: 5, desde: '11:00', hasta: '12:30' },
+    ]
+  },
+  {
+    id: 'gutierrez', apellido: 'Gutiérrez Biurrum', nombre: 'María Inés', esp: 'Odontología',
+    color: '#533BAF', light: '#EEEDFE', ini: 'GI', dur: 45,
+    horarios: [
+      { dia: 1, desde: '16:15', hasta: '19:15' },
+      { dia: 2, desde: '08:00', hasta: '12:15' },
+      { dia: 3, desde: '16:15', hasta: '19:15' },
+      { dia: 4, desde: '16:15', hasta: '19:15' },
+      { dia: 5, desde: '09:00', hasta: '12:15' },
+    ]
+  },
+  {
+    id: 'farre', apellido: 'Julián Farré', nombre: 'Carolina', esp: 'Fonoaudiología',
+    color: '#C0572A', light: '#FDEEE7', ini: 'JF', dur: 50,
+    horarios: [
+      { dia: 2, desde: '15:30', hasta: '20:20' },
+      { dia: 4, desde: '15:30', hasta: '20:20' },
+    ]
+  },
+  {
+    id: 'julian', apellido: 'Julián', nombre: 'Gerardo Rafael', esp: 'Odontología',
+    color: '#2D6A4F', light: '#E8F5EE', ini: 'GJ', dur: 30,
+    horarios: [
+      { dia: 1, desde: '16:30', hasta: '19:30' },
+      { dia: 2, desde: '16:30', hasta: '19:30' },
+      { dia: 3, desde: '16:30', hasta: '19:30' },
+      { dia: 4, desde: '16:30', hasta: '19:30' },
+      { dia: 5, desde: '16:30', hasta: '19:30' },
+    ]
+  },
+  {
+    id: 'orlando', apellido: 'Orlando', nombre: 'Cristian Pablo', esp: 'Odontología',
+    color: '#7B3F00', light: '#F5EAE0', ini: 'CO', dur: 45,
+    horarios: [
+      { dia: 1, desde: '16:30', hasta: '20:00' },
+      { dia: 2, desde: '16:30', hasta: '20:00' },
+      { dia: 3, desde: '16:30', hasta: '20:00' },
+      { dia: 4, desde: '16:30', hasta: '20:00' },
+      { dia: 5, desde: '08:00', hasta: '11:30' },
+    ]
+  },
+  {
+    id: 'sabio_g', apellido: 'Sabio', nombre: 'Gabriel', esp: 'Odontología',
+    color: '#4A5568', light: '#EEF0F4', ini: 'GS', dur: 30,
+    horarios: [
+      { dia: 1, desde: '17:00', hasta: '20:00' },
+      { dia: 2, desde: '09:00', hasta: '11:30' },
+      { dia: 3, desde: '16:30', hasta: '20:00' },
+      { dia: 4, desde: '16:30', hasta: '20:00' },
+      { dia: 5, desde: '09:00', hasta: '11:30' },
+    ]
+  },
+  {
+    id: 'sabio_f', apellido: 'Sabio', nombre: 'Franco', esp: 'Odontología',
+    color: '#6B46C1', light: '#F0EBFF', ini: 'FS', dur: 30,
+    horarios: [
+      { dia: 1, desde: '09:30', hasta: '12:00' },
+      { dia: 1, desde: '19:00', hasta: '20:30' },
+      { dia: 2, desde: '09:30', hasta: '12:00' },
+      { dia: 3, desde: '09:30', hasta: '12:00' },
+      { dia: 3, desde: '17:30', hasta: '20:30' },
+      { dia: 4, desde: '09:30', hasta: '12:00' },
+      { dia: 5, desde: '09:30', hasta: '12:00' },
+      { dia: 5, desde: '19:00', hasta: '20:30' },
+    ]
+  },
+  {
+    id: 'sat', apellido: 'Sat', nombre: 'Mariana', esp: 'Odontología',
+    color: '#D4A017', light: '#FDF6E3', ini: 'MS', dur: 30,
+    horarios: [
+      { dia: 1, desde: '09:00', hasta: '11:30' },
+      { dia: 2, desde: '09:00', hasta: '11:00' },
+      { dia: 2, desde: '16:00', hasta: '20:00' },
+      { dia: 4, desde: '09:00', hasta: '11:30' },
+      { dia: 5, desde: '08:30', hasta: '09:00' },
+    ]
+  },
+  {
+    id: 'sciarraba', apellido: 'Sciarraba', nombre: 'Edgardo Adrián', esp: 'Otorrinolaringología',
+    color: '#B7410E', light: '#FCEEE9', ini: 'ES', dur: 20,
+    horarios: [
+      { dia: 2, desde: '16:50', hasta: '18:50' },
+      { dia: 3, desde: '16:50', hasta: '18:50' },
+      { dia: 4, desde: '16:50', hasta: '18:50' },
+    ]
+  },
+  {
+    id: 'xdigital', apellido: 'X Digital', nombre: '', esp: 'Odontología Digital',
+    color: '#2C7873', light: '#E0F2F1', ini: 'XD', dur: 30,
+    horarios: [
+      { dia: 2, desde: '17:00', hasta: '20:00' },
+    ]
+  },
+];
+
+const DIAS_N = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+const DIAS_L = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+const MESES  = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const MESES_M= ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const TEL_CLINICA = '2604396462';
+
+// Estado global
+let profs = [...PROFESIONALES_INIT];
+let turnos = [];       // se llena desde Firestore
+let pacientes = [];    // se llena desde Firestore
+let profSelAgenda = 'todos';
+let offSemana = 0;
+let diaSelDoc = hoyStr();
+let profSelDoc = null;
+let unsubTurnos = null;
+let unsubPacientes = null;
+let turnoEditando = null;
+let pacienteSelModal = null;
+
+function hoyStr() {
+  const h = new Date();
+  return `${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')}`;
+}
+function fStr(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function getLunes(off=0) {
+  const h = new Date();
+  h.setHours(0,0,0,0);
+  const dow = (h.getDay()+6)%7;
+  h.setDate(h.getDate() - dow + off*7);
+  return h;
+}
+function addMinutes(hhmm, mins) {
+  const [hh,mm] = hhmm.split(':').map(Number);
+  const total = hh*60 + mm + mins;
+  return `${String(Math.floor(total/60)).padStart(2,'0')}:${String(total%60).padStart(2,'0')}`;
+}
+function gProf(id) { return profs.find(p=>p.id===id); }
+function labelF(str) {
+  const d = new Date(str+'T00:00:00');
+  return `${d.getDate()} de ${MESES[d.getMonth()]}`;
+}
+
+// Genera slots para un prof en una fecha (respeta múltiples franjas)
+function generarSlots(profId, fecha, incluirOcupados=true) {
+  const p = gProf(profId); if(!p) return [];
+  const d = new Date(fecha+'T00:00:00');
+  const dow = d.getDay();
+  const franjas = p.horarios.filter(h=>h.dia===dow);
+  if(!franjas.length) return [];
+  const slots = [];
+  franjas.forEach(f => {
+    let cur = f.desde;
+    while(cur < f.hasta) {
+      const ocup = turnos.filter(t=>t.profesionalId===profId&&t.fecha===fecha&&t.hora===cur&&t.estado!=='cancelado');
+      slots.push({ hora: cur, disponible: ocup.length===0, ocupantes: ocup });
+      cur = addMinutes(cur, p.dur);
+      if(cur > f.hasta) break;
+    }
+  });
+  return slots;
+}
+
+// ══════════════════════════════════════════════
+//  AUTH
+// ══════════════════════════════════════════════
+const USUARIO_DEMO = 'clinica@espejo.com'; // guardamos así en Firebase Auth
+const PASSWORD_DEMO = 'espejo2026';
+
+onAuthStateChanged(auth, user => {
+  if(user) {
+    mostrarApp();
+  } else {
+    mostrarLogin();
+  }
+});
+
+window._login = async function() {
+  const usr = document.getElementById('loginUser').value.trim().toLowerCase();
+  const pwd = document.getElementById('loginPwd').value.trim();
+  const err = document.getElementById('loginErr');
+  err.textContent = '';
+  // Aceptar "clinica espejo" o el email completo
+  if(usr !== 'clinica espejo' && usr !== 'clinica@espejo.com') {
+    err.textContent = 'Usuario incorrecto'; return;
+  }
+  if(pwd !== 'espejo2026') { err.textContent = 'Contraseña incorrecta'; return; }
+  try {
+    await signInWithEmailAndPassword(auth, USUARIO_DEMO, PASSWORD_DEMO);
+  } catch(e) {
+    err.textContent = 'Error de conexión: ' + e.message;
+  }
+};
+
+window._logout = async function() {
+  if(unsubTurnos) unsubTurnos();
+  if(unsubPacientes) unsubPacientes();
+  await signOut(auth);
+};
+
+function mostrarLogin() {
+  document.getElementById('appLogin').style.display='flex';
+  document.getElementById('appMain').style.display='none';
+}
+function mostrarApp() {
+  document.getElementById('appLogin').style.display='none';
+  document.getElementById('appMain').style.display='flex';
+  iniciarListeners();
+  renderSidebar();
+  renderAgenda();
+  renderTurnosHoy();
+  renderRecordatorios();
+}
+
+// ══════════════════════════════════════════════
+//  LISTENERS FIRESTORE
+// ══════════════════════════════════════════════
+function iniciarListeners() {
+  // Turnos en tiempo real
+  const qT = query(collection(db,'turnos'), orderBy('fecha'), orderBy('hora'));
+  unsubTurnos = onSnapshot(qT, snap => {
+    turnos = snap.docs.map(d=>({...d.data(), id: d.id}));
+    renderAgenda();
+    renderTurnosHoy();
+    renderRecordatorios();
+    actualizarBadges();
+    if(document.getElementById('vDoc').style.display!=='none') renderVistaMedico();
+  });
+  // Pacientes en tiempo real
+  const qP = query(collection(db,'pacientes'), orderBy('apellido'));
+  unsubPacientes = onSnapshot(qP, snap => {
+    pacientes = snap.docs.map(d=>({...d.data(), id: d.id}));
+  });
+}
+
+// ══════════════════════════════════════════════
+//  TURNOS — CRUD
+// ══════════════════════════════════════════════
+window._guardarTurno = async function() {
+  const profId    = document.getElementById('nProf').value;
+  const fecha     = document.getElementById('nFecha').value;
+  const hora      = document.getElementById('nHora').value;
+  const esSobre   = document.getElementById('nSobre').checked;
+  const nombre    = document.getElementById('nPacNombre').value.trim();
+  const apellido  = document.getElementById('nPacApellido').value.trim();
+  const dni       = document.getElementById('nPacDni').value.trim();
+  const tel       = document.getElementById('nPacTel').value.trim();
+  const serv      = document.getElementById('nServ').value.trim();
+  const nota      = document.getElementById('nNota').value.trim();
+
+  if(!profId||!fecha||!hora||!nombre) { toast('Completá profesional, fecha, hora y nombre','err'); return; }
+
+  // Verificar colisión (salvo sobreturno)
+  if(!esSobre) {
+    const col = turnos.find(t=>t.profesionalId===profId&&t.fecha===fecha&&t.hora===hora&&t.estado!=='cancelado');
+    if(col) { toast('Ese horario ya está ocupado. Marcá como sobreturno si querés agregarlo igual.','err'); return; }
+  }
+
+  // Buscar o crear paciente
+  let pacId = pacienteSelModal;
+  if(!pacId) {
+    // buscar por DNI
+    const existing = pacientes.find(p=>p.dni&&p.dni===dni);
+    if(existing) {
+      pacId = existing.id;
+    } else {
+      const ref = await addDoc(collection(db,'pacientes'), {
+        nombre, apellido, dni: dni||'', telefono: tel||'',
+        creadoEn: serverTimestamp()
+      });
+      pacId = ref.id;
+    }
+  }
+
+  const data = {
+    profesionalId: profId,
+    pacienteId: pacId,
+    pacNombre: nombre + ' ' + apellido,
+    pacTel: tel,
+    fecha, hora, servicio: serv,
+    estado: 'confirmado',
+    esSobreturno: esSobre,
+    nota,
+    creadoEn: serverTimestamp()
+  };
+
+  if(turnoEditando) {
+    await updateDoc(doc(db,'turnos',turnoEditando), data);
+    toast('Turno actualizado','ok');
+  } else {
+    await addDoc(collection(db,'turnos'), data);
+    toast('Turno guardado','ok');
+  }
+  cerrarModal('modalNuevo');
+  limpiarFormNuevo();
+};
+
+window._cancelarTurno = async function(id, motivo='') {
+  await updateDoc(doc(db,'turnos',id), { estado:'cancelado', motivoCancelacion: motivo });
+  toast('Turno cancelado','ok');
+  cerrarModal('modalDet');
+};
+
+window._confirmarTurno = async function(id) {
+  await updateDoc(doc(db,'turnos',id), { estado:'confirmado' });
+  toast('Turno confirmado','ok');
+};
+
+// ══════════════════════════════════════════════
+//  RENDER AGENDA SEMANAL
+// ══════════════════════════════════════════════
+function renderAgenda() {
+  const lunes = getLunes(offSemana);
+  const sab = new Date(lunes); sab.setDate(lunes.getDate()+5);
+  document.getElementById('weekLbl').textContent =
+    `${lunes.getDate()} – ${sab.getDate()} de ${MESES[lunes.getMonth()]} ${lunes.getFullYear()}`;
+
+  const HOY = hoyStr();
+  const head = document.getElementById('agHead');
+  head.innerHTML = '<div style="width:64px;border-right:1px solid var(--bor)"></div>';
+  for(let i=0;i<6;i++){
+    const d=new Date(lunes); d.setDate(lunes.getDate()+i);
+    const fs=fStr(d); const esH=fs===HOY;
+    const cnt=turnos.filter(t=>t.fecha===fs&&t.estado!=='cancelado'&&(profSelAgenda==='todos'||t.profesionalId===profSelAgenda)).length;
+    head.innerHTML+=`<div class="ag-dhdr${esH?' hoy':''}">
+      <div class="ag-dnom">${DIAS_N[d.getDay()]}</div>
+      ${esH?`<div class="ag-dnum hoy-n">${d.getDate()}</div>`:`<div class="ag-dnum">${d.getDate()}</div>`}
+      ${cnt?`<div style="font-size:10px;color:var(--gm);margin-top:1px">${cnt} turno${cnt>1?'s':''}</div>`:''}
+    </div>`;
+  }
+
+  // Recopilar todas las horas únicas de los profesionales activos
+  const horasSet = new Set();
+  profs.forEach(p => {
+    if(profSelAgenda!=='todos' && p.id!==profSelAgenda) return;
+    for(let i=0;i<6;i++){
+      const d=new Date(lunes); d.setDate(lunes.getDate()+i);
+      generarSlots(p.id, fStr(d)).forEach(s=>horasSet.add(s.hora));
+    }
+    // También agregar horas de turnos reales (sobreturnos fuera de horario)
+    turnos.filter(t=>t.profesionalId===p.id).forEach(t=>horasSet.add(t.hora));
+  });
+  const horas = [...horasSet].sort();
+
+  const body = document.getElementById('agBody');
+  body.innerHTML = '';
+  horas.forEach(hora => {
+    let row = `<div class="ag-row"><div class="ag-time">${hora}</div>`;
+    for(let i=0;i<6;i++){
+      const d=new Date(lunes); d.setDate(lunes.getDate()+i);
+      const fs=fStr(d); const esH=fs===HOY;
+      // turnos en este slot
+      const ts = turnos.filter(t=>
+        t.fecha===fs && t.hora===hora && t.estado!=='cancelado' &&
+        (profSelAgenda==='todos'||t.profesionalId===profSelAgenda)
+      );
+      let cell = ts.map(t=>{
+        const p=gProf(t.profesionalId);
+        return `<div class="tblk${t.esSobreturno?' sobre':''}" 
+          style="background:${t.esSobreturno?'#FFE4E4':'${p?.light||"#eee"}'};border-left-color:${t.esSobreturno?'#E24B4A':p?.color||'#888'}"
+          onclick="_verDetalle('${t.id}')">
+          <div class="tn">${t.pacNombre.split(' ')[0]} ${t.esSobreturno?'<span style="font-size:9px;background:#E24B4A;color:white;border-radius:3px;padding:0 3px">ST</span>':''}</div>
+          <div class="ti">${p?.apellido||''}</div>
+        </div>`;
+      }).join('');
+      // celda clickeable para nuevo turno
+      row+=`<div class="ag-cell${esH?' hoy':''}" onclick="_celdaClick('${fs}','${hora}')">${cell}</div>`;
+    }
+    row+='</div>';
+    body.innerHTML+=row;
+  });
+
+  if(!horas.length) {
+    body.innerHTML='<div style="padding:2rem;text-align:center;color:var(--gm);font-size:13px">Sin turnos ni horarios disponibles para esta semana con el filtro actual</div>';
+  }
+}
+
+// ══════════════════════════════════════════════
+//  TURNOS HOY
+// ══════════════════════════════════════════════
+function renderTurnosHoy() {
+  const HOY = hoyStr();
+  const ts = turnos.filter(t=>t.fecha===HOY&&t.estado!=='cancelado').sort((a,b)=>a.hora.localeCompare(b.hora));
+  const el = document.getElementById('turnosHoyList');
+  if(!ts.length){el.innerHTML='<div class="empty-msg">Sin turnos para hoy</div>';return;}
+  el.innerHTML=ts.map(t=>{
+    const p=gProf(t.profesionalId);
+    return `<div class="t-row${t.esSobreturno?' sobre':''}" onclick="_verDetalle('${t.id}')">
+      <span class="t-hora">${t.hora}</span>
+      <div class="t-pdot" style="background:${p?.color||'#888'}"></div>
+      <div class="t-inf">
+        <div class="t-nom">${t.pacNombre}</div>
+        <div class="t-det">${t.servicio||'—'} · ${p?.apellido||'—'}</div>
+      </div>
+      ${t.esSobreturno?'<span class="pill sobre">Sobreturno</span>':''}
+      <span class="pill confirmado">Confirmado</span>
+    </div>`;
+  }).join('');
+  document.getElementById('cntHoy').textContent=`${ts.length} turno${ts.length!==1?'s':''}`;
+}
+
+// ══════════════════════════════════════════════
+//  RECORDATORIOS
+// ══════════════════════════════════════════════
+function renderRecordatorios() {
+  const manana = new Date(); manana.setDate(manana.getDate()+1);
+  const mStr = fStr(manana);
+  const ts = turnos.filter(t=>t.fecha===mStr&&t.estado!=='cancelado');
+  const el = document.getElementById('recList');
+  document.getElementById('recCnt').textContent=`${ts.length} para mañana`;
+  if(!ts.length){el.innerHTML='<div class="empty-msg">Sin turnos para mañana</div>';return;}
+  const waIco=`<svg width="17" height="17" viewBox="0 0 20 20" fill="#25D366"><path d="M10 1C5 1 1 5 1 10c0 1.8.5 3.4 1.3 4.8L1 19l4.3-1.3A9 9 0 1 0 10 1z"/></svg>`;
+  el.innerHTML=ts.map(t=>{
+    const p=gProf(t.profesionalId);
+    const msg=encodeURIComponent(`Hola ${t.pacNombre.split(' ')[0]} 👋 Te recordamos tu turno en *Instituto Espejo* mañana *${labelF(t.fecha)}* a las *${t.hora} hs* con *${p?.nombre||''} ${p?.apellido||''}*.\n📍 San Rafael, Mendoza · ☎️ ${TEL_CLINICA}\nRespondé este mensaje si necesitás cancelar. ¡Te esperamos! 😊`);
+    return `<div class="rec-row">
+      <div class="rec-ico">${waIco}</div>
+      <div style="flex:1">
+        <div class="rec-n">${t.pacNombre}</div>
+        <div class="rec-d">${t.hora} · ${p?.apellido||''}</div>
+      </div>
+      <a href="https://wa.me/549${t.pacTel}?text=${msg}" target="_blank" class="btn-wa-sm">Enviar</a>
+    </div>`;
+  }).join('');
+}
+
+window._enviarTodosWA = function() {
+  const manana = new Date(); manana.setDate(manana.getDate()+1);
+  const mStr = fStr(manana);
+  const ts = turnos.filter(t=>t.fecha===mStr&&t.estado!=='cancelado'&&t.pacTel);
+  if(!ts.length){toast('No hay turnos para mañana','err');return;}
+  ts.forEach((t,i)=>{
+    setTimeout(()=>{
+      const p=gProf(t.profesionalId);
+      const msg=encodeURIComponent(`Hola ${t.pacNombre.split(' ')[0]} 👋 Te recordamos tu turno en *Instituto Espejo* mañana *${labelF(t.fecha)}* a las *${t.hora} hs* con *${p?.nombre||''} ${p?.apellido||''}*.\n📍 San Rafael, Mendoza · ☎️ ${TEL_CLINICA}\nRespondé si necesitás cancelar. ¡Te esperamos! 😊`);
+      window.open(`https://wa.me/549${t.pacTel}?text=${msg}`,'_blank');
+    }, i*800);
+  });
+  toast(`Abriendo ${ts.length} chats de WhatsApp...`,'wa');
+};
+
+// ══════════════════════════════════════════════
+//  SIDEBAR PROFESIONALES
+// ══════════════════════════════════════════════
+function renderSidebar() {
+  const el = document.getElementById('profList');
+  el.innerHTML = `<button class="prof-chip${profSelAgenda==='todos'?' active':''}" onclick="_filtrarProf('todos')">
+    <div class="prof-dot" style="background:var(--azul)"></div><span>Todos</span>
+  </button>`;
+  profs.forEach(p=>{
+    el.innerHTML+=`<button class="prof-chip${profSelAgenda===p.id?' active':''}" onclick="_filtrarProf('${p.id}')" style="--pc:${p.color}">
+      <div class="prof-dot" style="background:${p.color}"></div>
+      <div style="flex:1;text-align:left"><div style="font-size:11.5px;font-weight:500;color:var(--go)">${p.apellido}</div><div style="font-size:10px;color:var(--gm)">${p.esp}</div></div>
+    </button>`;
+  });
+}
+
+window._filtrarProf = function(id) {
+  profSelAgenda=id;
+  renderSidebar();
+  renderAgenda();
+};
+
+// ══════════════════════════════════════════════
+//  STATS
+// ══════════════════════════════════════════════
+function actualizarBadges() {
+  const HOY = hoyStr();
+  const manana = new Date(); manana.setDate(manana.getDate()+1);
+  const mStr = fStr(manana);
+  document.getElementById('statHoy').textContent = turnos.filter(t=>t.fecha===HOY&&t.estado!=='cancelado').length;
+  document.getElementById('statManana').textContent = turnos.filter(t=>t.fecha===mStr&&t.estado!=='cancelado').length;
+  document.getElementById('statSem').textContent = (() => {
+    let cnt=0;
+    for(let i=0;i<6;i++){const d=getLunes();d.setDate(d.getDate()+i);cnt+=turnos.filter(t=>t.fecha===fStr(d)&&t.estado!=='cancelado').length;}
+    return cnt;
+  })();
+}
+
+// ══════════════════════════════════════════════
+//  MODAL NUEVO TURNO
+// ══════════════════════════════════════════════
+window._celdaClick = function(fecha, hora) {
+  abrirModalNuevo(fecha, hora);
+};
+window._abrirNuevo = function() { abrirModalNuevo(); };
+
+function abrirModalNuevo(fecha='', hora='') {
+  turnoEditando = null;
+  pacienteSelModal = null;
+  limpiarFormNuevo();
+  // poblar select prof
+  const sel=document.getElementById('nProf');
+  sel.innerHTML=profs.map(p=>`<option value="${p.id}">${p.apellido}${p.nombre?' - '+p.nombre:''}</option>`).join('');
+  // poblar servicios
+  document.getElementById('nServ').value='Consulta';
+  if(fecha) document.getElementById('nFecha').value=fecha;
+  else document.getElementById('nFecha').value=hoyStr();
+  _actualizarSlots();
+  if(hora) {
+    setTimeout(()=>{
+      document.querySelectorAll('.slot-m').forEach(b=>{ if(b.dataset.hora===hora){ b.click(); } });
+    },100);
+  }
+  abrirModal('modalNuevo');
+}
+
+function limpiarFormNuevo() {
+  ['nPacNombre','nPacApellido','nPacDni','nPacTel','nNota'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  document.getElementById('nHora').value='';
+  document.getElementById('nSobre').checked=false;
+  document.getElementById('nBuscador').value='';
+  document.getElementById('nBuscRes').innerHTML='';
+  pacienteSelModal=null;
+}
+
+window._actualizarSlots = function() {
+  const profId=document.getElementById('nProf').value;
+  const fecha=document.getElementById('nFecha').value;
+  const g=document.getElementById('nSlotsGrid');
+  document.getElementById('nHora').value='';
+  if(!profId||!fecha){g.innerHTML='<div class="slot-none">Seleccioná profesional y fecha</div>';return;}
+  const slots=generarSlots(profId,fecha);
+  if(!slots.length){g.innerHTML='<div class="slot-none">Sin horarios disponibles ese día</div>';return;}
+  g.innerHTML=slots.map(s=>`<button class="slot-m${!s.disponible?' ocup':''}" data-hora="${s.hora}" onclick="_selSlot(this,'${s.hora}')" ${!s.disponible?'disabled':''}>${s.hora}</button>`).join('');
+};
+
+window._selSlot = function(btn,h) {
+  document.querySelectorAll('.slot-m').forEach(b=>b.classList.remove('sel'));
+  btn.classList.add('sel');
+  document.getElementById('nHora').value=h;
+};
+
+// Buscador de pacientes
+window._buscarPaciente = function(q) {
+  const res=document.getElementById('nBuscRes');
+  if(!q||q.length<2){res.innerHTML='';return;}
+  const hits=pacientes.filter(p=>`${p.nombre} ${p.apellido}`.toLowerCase().includes(q.toLowerCase())||
+    (p.dni&&p.dni.includes(q))).slice(0,6);
+  if(!hits.length){res.innerHTML='<div class="bres-item" style="color:var(--gm)">Sin resultados</div>';return;}
+  res.innerHTML=hits.map(p=>`<div class="bres-item" onclick="_selPaciente('${p.id}')">
+    <strong>${p.apellido}, ${p.nombre}</strong>
+    <span style="font-size:11px;color:var(--gm)">DNI: ${p.dni||'—'} · ${p.telefono||'—'}</span>
+  </div>`).join('');
+};
+
+window._selPaciente = function(id) {
+  const p=pacientes.find(x=>x.id===id); if(!p) return;
+  pacienteSelModal=id;
+  document.getElementById('nPacNombre').value=p.nombre||'';
+  document.getElementById('nPacApellido').value=p.apellido||'';
+  document.getElementById('nPacDni').value=p.dni||'';
+  document.getElementById('nPacTel').value=p.telefono||'';
+  document.getElementById('nBuscRes').innerHTML='';
+  document.getElementById('nBuscador').value=`${p.apellido}, ${p.nombre}`;
+};
+
+// ══════════════════════════════════════════════
+//  DETALLE TURNO
+// ══════════════════════════════════════════════
+window._verDetalle = async function(id) {
+  const t=turnos.find(x=>x.id===id); if(!t) return;
+  const p=gProf(t.profesionalId);
+  // historial del paciente
+  const tsPac=turnos.filter(x=>x.pacienteId===t.pacienteId&&x.id!==id&&x.estado!=='cancelado')
+    .sort((a,b)=>b.fecha.localeCompare(a.fecha)).slice(0,5);
+
+  document.getElementById('detTitle').textContent=`Turno · ${t.pacNombre}`;
+  document.getElementById('detBody').innerHTML=`
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:1rem">
+      <div class="pac-ava" style="background:${p?.light||'#eee'};color:${p?.color||'#888'}">${t.pacNombre.split(' ').map(w=>w[0]).slice(0,2).join('')}</div>
+      <div>
+        <div style="font-size:15px;font-weight:500">${t.pacNombre}</div>
+        <div style="font-size:12px;color:var(--gm);margin-top:2px">📱 ${t.pacTel||'Sin teléfono'}</div>
+      </div>
+      ${t.esSobreturno?'<span class="pill sobre" style="margin-left:auto">Sobreturno</span>':'<span style="margin-left:auto"></span>'}
+    </div>
+    <div class="det-blk">
+      <div class="det-row"><span class="det-k">Fecha y hora</span><span class="det-v">${labelF(t.fecha)} · ${t.hora} hs</span></div>
+      <div class="det-row"><span class="det-k">Profesional</span><span class="det-v" style="color:${p?.color}">${p?.nombre} ${p?.apellido||'—'}</span></div>
+      <div class="det-row"><span class="det-k">Especialidad</span><span class="det-v">${p?.esp||'—'}</span></div>
+      <div class="det-row"><span class="det-k">Servicio</span><span class="det-v">${t.servicio||'—'}</span></div>
+      <div class="det-row"><span class="det-k">Nota</span><span class="det-v">${t.nota||'—'}</span></div>
+    </div>
+    ${tsPac.length?`
+    <div style="margin-top:1rem">
+      <div style="font-size:11px;font-weight:600;color:var(--gm);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Historial del paciente</div>
+      ${tsPac.map(h=>{const hp=gProf(h.profesionalId);return `<div class="hist-row"><span style="color:var(--gm);min-width:80px;font-size:12px">${labelF(h.fecha)}</span><span style="flex:1;font-size:12.5px">${hp?.apellido||'—'} · ${h.servicio||'—'}</span>${h.nota?`<span style="font-size:11px;color:var(--ambar);font-style:italic">${h.nota}</span>`:''}</div>`}).join('')}
+    </div>`:''}
+    <div style="margin-top:1rem">
+      <label style="font-size:11px;font-weight:600;color:var(--gm);text-transform:uppercase;letter-spacing:.5px">Nota clínica</label>
+      <textarea id="detNota" class="finput" style="min-height:60px;margin-top:4px;resize:vertical">${t.nota||''}</textarea>
+    </div>
+  `;
+  document.getElementById('detFooter').innerHTML=`
+    <button class="btn-sec" onclick="cerrarModal('modalDet')">Cerrar</button>
+    <button class="btn-sec" onclick="_editarTurno('${t.id}')">✏️ Editar</button>
+    <button class="btn-sec" style="color:var(--rojo)" onclick="_pedirCancelacion('${t.id}')">Cancelar turno</button>
+    <button class="btn-primary" onclick="_guardarNota('${t.id}')">💾 Guardar nota</button>
+    ${t.pacTel?`<a href="https://wa.me/549${t.pacTel}?text=${encodeURIComponent(`Hola ${t.pacNombre.split(' ')[0]} 👋`)}" target="_blank" class="btn-wa-sm" style="padding:8px 14px">WA</a>`:''}
+  `;
+  abrirModal('modalDet');
+};
+
+window._guardarNota = async function(id) {
+  const nota=document.getElementById('detNota').value.trim();
+  await updateDoc(doc(db,'turnos',id),{nota});
+  toast('Nota guardada','ok');
+};
+
+window._pedirCancelacion = function(id) {
+  const motivo=prompt('Motivo de cancelación (opcional):');
+  if(motivo!==null) _cancelarTurno(id, motivo);
+};
+
+window._editarTurno = function(id) {
+  const t=turnos.find(x=>x.id===id); if(!t) return;
+  turnoEditando=id;
+  cerrarModal('modalDet');
+  abrirModalNuevo(t.fecha, t.hora);
+  setTimeout(()=>{
+    document.getElementById('nProf').value=t.profesionalId;
+    document.getElementById('nPacNombre').value=t.pacNombre.split(' ')[0]||'';
+    document.getElementById('nPacApellido').value=t.pacNombre.split(' ').slice(1).join(' ')||'';
+    document.getElementById('nPacTel').value=t.pacTel||'';
+    document.getElementById('nServ').value=t.servicio||'';
+    document.getElementById('nNota').value=t.nota||'';
+    document.getElementById('nSobre').checked=t.esSobreturno||false;
+    _actualizarSlots();
+    setTimeout(()=>{ document.querySelectorAll('.slot-m').forEach(b=>{ if(b.dataset.hora===t.hora) b.click(); }); },100);
+  },100);
+};
+
+// ══════════════════════════════════════════════
+//  VISTA MÉDICO
+// ══════════════════════════════════════════════
+function initVistaMedico() {
+  profSelDoc = profs[0].id;
+  diaSelDoc = hoyStr();
+  renderDocPills();
+  renderVistaMedico();
+}
+
+function renderDocPills() {
+  document.getElementById('docPills').innerHTML=profs.map(p=>`
+    <button class="dpill${profSelDoc===p.id?' active':''}" style="--pc:${p.color};${profSelDoc===p.id?`background:${p.color};color:white;border-color:${p.color}`:''}" onclick="_selDoc('${p.id}')">
+      ${p.apellido}
+    </button>
+  `).join('');
+}
+
+window._selDoc = function(id) {
+  profSelDoc=id; diaSelDoc=hoyStr();
+  renderDocPills();
+  renderVistaMedico();
+};
+
+function renderVistaMedico() {
+  const p=gProf(profSelDoc); if(!p) return;
+  document.getElementById('docNombreEl').textContent=`${p.nombre} ${p.apellido}`;
+  document.getElementById('docEspEl').textContent=p.esp;
+  // Stats doc
+  const HOY=hoyStr();
+  const misHoy=turnos.filter(t=>t.profesionalId===profSelDoc&&t.fecha===HOY&&t.estado!=='cancelado');
+  document.getElementById('docStatHoy').textContent=misHoy.length;
+  // Week tabs
+  renderDocTabs();
+  renderDocTurnos();
+  renderDocSlots();
+}
+
+function renderDocTabs() {
+  const lunes=getLunes(offSemana);
+  const el=document.getElementById('docDayTabs'); el.innerHTML='';
+  const HOY=hoyStr();
+  for(let i=0;i<6;i++){
+    const d=new Date(lunes); d.setDate(lunes.getDate()+i);
+    const fs=fStr(d);
+    const p=gProf(profSelDoc);
+    const trab=p?.horarios.some(h=>h.dia===d.getDay());
+    const cnt=turnos.filter(t=>t.profesionalId===profSelDoc&&t.fecha===fs&&t.estado!=='cancelado').length;
+    const esA=fs===diaSelDoc;
+    const esH=fs===HOY;
+    el.innerHTML+=`<button class="dtab${esA?' activo':''}${!trab?' nodis':''}" style="${esA?`background:${p?.color};color:white`:''}" onclick="${trab?`_docSelDia('${fs}')`:''}" >
+      <span style="font-size:10px;text-transform:uppercase;letter-spacing:.3px">${DIAS_N[d.getDay()]}</span>
+      <span style="font-size:16px;font-weight:500;${esH&&!esA?'text-decoration:underline':''}">${d.getDate()}</span>
+      ${cnt?`<span class="dtab-cnt" style="background:${esA?'rgba(255,255,255,.3)':p?.color}">${cnt}</span>`:''}
+    </button>`;
+  }
+}
+
+window._docSelDia = function(f) { diaSelDoc=f; renderDocTabs(); renderDocTurnos(); renderDocSlots(); };
+
+function renderDocTurnos() {
+  const p=gProf(profSelDoc);
+  const ts=turnos.filter(t=>t.profesionalId===profSelDoc&&t.fecha===diaSelDoc&&t.estado!=='cancelado').sort((a,b)=>a.hora.localeCompare(b.hora));
+  const el=document.getElementById('docTurnosList');
+  if(!ts.length){
+    const d=new Date(diaSelDoc+'T00:00:00');
+    const trab=p?.horarios.some(h=>h.dia===d.getDay());
+    el.innerHTML=`<div class="empty-msg">${trab?'Sin turnos agendados para este día':'No trabajás este día'}</div>`;
+    return;
+  }
+  el.innerHTML=ts.map(t=>`
+    <div class="dt-item${t.esSobreturno?' sobre':''}" onclick="_verDetalle('${t.id}')">
+      <div style="font-size:20px;font-weight:500;min-width:54px;color:${p?.color}">${t.hora}</div>
+      <div style="flex:1">
+        <div style="font-size:14px;font-weight:500">${t.pacNombre}</div>
+        <div style="font-size:12px;color:var(--gm);margin-top:2px">${t.servicio||'—'} · 📱 ${t.pacTel||'—'}</div>
+        ${t.nota?`<div style="font-size:11.5px;color:var(--ambar);margin-top:2px;font-style:italic">⚠️ ${t.nota}</div>`:''}
+      </div>
+      ${t.esSobreturno?'<span class="pill sobre">ST</span>':''}
+    </div>
+  `).join('');
+}
+
+function renderDocSlots() {
+  const p=gProf(profSelDoc);
+  const slots=generarSlots(profSelDoc, diaSelDoc);
+  const el=document.getElementById('docSlotsEl');
+  if(!slots.length){el.innerHTML='<div style="padding:.75rem;text-align:center;font-size:12px;color:var(--gm)">Sin horarios</div>';return;}
+  el.innerHTML=slots.map(s=>`<div class="slot-d ${s.disponible?'libre':'ocupado'}" style="${s.disponible?`border-color:${p?.color};background:${p?.light};color:${p?.color}`:''}">
+    ${s.hora}${s.ocupantes?.length>1?` <span style="font-size:9px">(${s.ocupantes.length})</span>`:''}
+  </div>`).join('');
+}
+
+// ══════════════════════════════════════════════
+//  GESTIÓN HORARIOS/PROFESIONALES
+// ══════════════════════════════════════════════
+function renderGestion() {
+  const el=document.getElementById('gestionList');
+  el.innerHTML=profs.map(p=>`
+    <div class="gestion-row">
+      <div class="prof-ava-sm" style="background:${p.color}">${p.ini}</div>
+      <div style="flex:1">
+        <div style="font-size:13.5px;font-weight:500">${p.apellido}${p.nombre?', '+p.nombre:''}</div>
+        <div style="font-size:11.5px;color:var(--gm)">${p.esp} · Turno cada ${p.dur} min</div>
+        <div style="font-size:11px;color:var(--gm);margin-top:2px">${p.horarios.map(h=>`${DIAS_N[h.dia]} ${h.desde}–${h.hasta}`).join(' | ')}</div>
+      </div>
+      <button class="btn-sec" style="font-size:12px" onclick="_editarProf('${p.id}')">✏️ Editar</button>
+    </div>
+  `).join('');
+}
+
+window._editarProf = function(id) {
+  const p=gProf(id); if(!p) return;
+  document.getElementById('epId').value=id;
+  document.getElementById('epApellido').value=p.apellido;
+  document.getElementById('epNombre').value=p.nombre;
+  document.getElementById('epEsp').value=p.esp;
+  document.getElementById('epDur').value=p.dur;
+  document.getElementById('epColor').value=p.color;
+  // Horarios: limpiar y mostrar
+  const horariosEl=document.getElementById('epHorarios');
+  horariosEl.innerHTML=p.horarios.map((h,i)=>`
+    <div class="hora-franja">
+      <select class="finput" style="width:100px" data-idx="${i}" data-field="dia">
+        ${[1,2,3,4,5,6].map(d=>`<option value="${d}"${h.dia===d?'selected':''}>${DIAS_N[d]}</option>`).join('')}
+      </select>
+      <input type="time" class="finput" style="width:110px" value="${h.desde}" data-idx="${i}" data-field="desde">
+      <span style="color:var(--gm)">a</span>
+      <input type="time" class="finput" style="width:110px" value="${h.hasta}" data-idx="${i}" data-field="hasta">
+      <button class="btn-sec" style="padding:4px 8px;color:var(--rojo)" onclick="this.closest('.hora-franja').remove()">✕</button>
+    </div>
+  `).join('');
+  abrirModal('modalEditProf');
+};
+
+window._agregarFranja = function() {
+  const el=document.getElementById('epHorarios');
+  const idx=el.querySelectorAll('.hora-franja').length;
+  const div=document.createElement('div'); div.className='hora-franja';
+  div.innerHTML=`
+    <select class="finput" style="width:100px" data-idx="${idx}" data-field="dia">
+      ${[1,2,3,4,5,6].map(d=>`<option value="${d}">${DIAS_N[d]}</option>`).join('')}
+    </select>
+    <input type="time" class="finput" style="width:110px" value="09:00" data-idx="${idx}" data-field="desde">
+    <span style="color:var(--gm)">a</span>
+    <input type="time" class="finput" style="width:110px" value="13:00" data-idx="${idx}" data-field="hasta">
+    <button class="btn-sec" style="padding:4px 8px;color:var(--rojo)" onclick="this.closest('.hora-franja').remove()">✕</button>
+  `;
+  el.appendChild(div);
+};
+
+window._guardarProf = function() {
+  const id=document.getElementById('epId').value;
+  const idx=profs.findIndex(p=>p.id===id); if(idx<0) return;
+  profs[idx].apellido=document.getElementById('epApellido').value.trim();
+  profs[idx].nombre=document.getElementById('epNombre').value.trim();
+  profs[idx].esp=document.getElementById('epEsp').value.trim();
+  profs[idx].dur=parseInt(document.getElementById('epDur').value)||30;
+  profs[idx].color=document.getElementById('epColor').value;
+  // Leer franjas
+  const franjas=[];
+  document.querySelectorAll('.hora-franja').forEach(f=>{
+    const dia=parseInt(f.querySelector('[data-field="dia"]').value);
+    const desde=f.querySelector('[data-field="desde"]').value;
+    const hasta=f.querySelector('[data-field="hasta"]').value;
+    if(dia&&desde&&hasta) franjas.push({dia,desde,hasta});
+  });
+  profs[idx].horarios=franjas;
+  cerrarModal('modalEditProf');
+  renderSidebar();
+  renderAgenda();
+  renderGestion();
+  toast('Profesional actualizado','ok');
+  // En producción: guardar en Firestore
+  // setDoc(doc(db,'profesionales',id), profs[idx]);
+};
+
+// ══════════════════════════════════════════════
+//  NAVEGACIÓN VISTAS
+// ══════════════════════════════════════════════
+window._switchVista = function(v) {
+  document.querySelectorAll('.vista').forEach(el=>el.style.display='none');
+  document.getElementById('v'+v.charAt(0).toUpperCase()+v.slice(1)).style.display='flex';
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('nb-'+v).classList.add('active');
+  if(v==='doc') { initVistaMedico(); }
+  if(v==='gestion') { renderGestion(); }
+};
+
+// ══════════════════════════════════════════════
+//  MINI CALENDARIO
+// ══════════════════════════════════════════════
+let miniCalOffset=0;
+function renderMiniCal() {
+  const hoy=new Date();
+  const mes=new Date(hoy.getFullYear(), hoy.getMonth()+miniCalOffset, 1);
+  const ultDia=new Date(mes.getFullYear(),mes.getMonth()+1,0).getDate();
+  const primerDow=(mes.getDay()+6)%7;
+  const HOY=hoyStr();
+  const turnosDias=new Set(turnos.map(t=>t.fecha));
+  document.getElementById('miniCalTit').textContent=`${MESES_M[mes.getMonth()]} ${mes.getFullYear()}`;
+  let html='';
+  ['Lu','Ma','Mi','Ju','Vi','Sá','Do'].forEach(d=>{ html+=`<div style="font-size:10px;text-align:center;color:var(--gm);font-weight:500">${d}</div>`; });
+  for(let i=0;i<primerDow;i++) html+='<div></div>';
+  for(let d=1;d<=ultDia;d++){
+    const fs=`${mes.getFullYear()}-${String(mes.getMonth()+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const esH=fs===HOY; const tieneTurnos=turnosDias.has(fs);
+    html+=`<div class="mc-d${esH?' hoy':''}${tieneTurnos&&!esH?' tiene':''}" onclick="_irAFecha('${fs}')">${d}</div>`;
+  }
+  document.getElementById('miniCalGrid').innerHTML=html;
+}
+window._miniCalNav=(d)=>{ miniCalOffset+=d; renderMiniCal(); };
+window._irAFecha=(f)=>{ 
+  const d=new Date(f+'T00:00:00');
+  const dow=(d.getDay()+6)%7;
+  const lunes=new Date(d); lunes.setDate(d.getDate()-dow);
+  const base=getLunes(0);
+  offSemana=Math.round((lunes-base)/(7*24*3600*1000));
+  renderAgenda();
+};
+
+// ══════════════════════════════════════════════
+//  UTILS
+// ══════════════════════════════════════════════
+function abrirModal(id){ document.getElementById(id).classList.add('open'); }
+function cerrarModal(id){ document.getElementById(id).classList.remove('open'); }
+window.cerrarModal=cerrarModal;
+
+let toastT;
+window.toast=function(msg,tipo='ok'){
+  const el=document.getElementById('toastEl');
+  document.getElementById('toastMsg').textContent=msg;
+  el.className=`toast ${tipo} show`;
+  clearTimeout(toastT);
+  toastT=setTimeout(()=>el.classList.remove('show'),3200);
+};
+
+document.querySelectorAll('.overlay').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('open');}));
+
+window._cambiarSemana=(d)=>{ offSemana+=d; renderAgenda(); renderDocTabs(); };
+window._irHoy=()=>{ offSemana=0; renderAgenda(); };
+
+// Mini cal init
+renderMiniCal();
+setInterval(renderMiniCal, 60000);
+
+</script>
+
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --azul:#1A4E7A;--azul-m:#2E6FAD;--azul-p:#EBF3FB;
+  --verde:#1D9E75;--verde-p:#E1F5EE;
+  --rojo:#E24B4A;--rojo-p:#FCEBEB;
+  --ambar:#BA7517;--ambar-p:#FAEEDA;
+  --go:#2C2C2A;--gm:#5F5E5A;--gc:#F1EFE8;--bor:#D3D1C7;
+  --r:10px;--rl:14px;--sh:0 2px 12px rgba(26,78,122,0.08);
+}
+body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-height:100vh}
+
+/* ── LOGIN ── */
+#appLogin{display:flex;min-height:100vh;align-items:center;justify-content:center;background:linear-gradient(135deg,#1A4E7A 0%,#2E6FAD 100%)}
+.login-card{background:white;border-radius:var(--rl);padding:2.5rem;width:360px;box-shadow:0 20px 60px rgba(0,0,0,0.2);text-align:center}
+.login-logo{font-family:'Playfair Display',serif;font-size:1.5rem;color:var(--azul);margin-bottom:.25rem}
+.login-sub{font-size:12.5px;color:var(--gm);margin-bottom:2rem}
+.login-err{color:var(--rojo);font-size:12.5px;margin-top:.5rem;min-height:18px}
+
+/* ── APP ── */
+#appMain{display:none;flex-direction:column;min-height:100vh}
+
+/* ── HEADER ── */
+.hdr{background:var(--azul);height:54px;display:flex;align-items:center;justify-content:space-between;padding:0 1.25rem;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,0.18)}
+.hdr-logo{display:flex;align-items:center;gap:9px}
+.hdr-logo-i{width:29px;height:29px;background:rgba(255,255,255,0.12);border-radius:7px;display:flex;align-items:center;justify-content:center}
+.hdr-logo-i svg{width:15px;height:15px;fill:white}
+.hdr-title{font-family:'Playfair Display',serif;font-size:15px;color:white;font-weight:500}
+.hdr-sub-t{font-size:10px;color:rgba(255,255,255,0.55);display:block}
+.hdr-nav{display:flex;gap:2px}
+.nav-btn{color:rgba(255,255,255,0.7);font-size:12px;padding:5px 11px;border-radius:6px;background:none;border:none;cursor:pointer;font-family:'Inter',sans-serif;transition:.15s}
+.nav-btn:hover{background:rgba(255,255,255,.1);color:white}
+.nav-btn.active{background:rgba(255,255,255,.18);color:white;font-weight:500}
+.hdr-right{display:flex;align-items:center;gap:8px}
+.hdr-tel{font-size:12px;color:rgba(255,255,255,.6)}
+
+/* ── LAYOUT ── */
+.app-body{display:grid;grid-template-columns:200px 1fr 220px;flex:1;min-height:calc(100vh - 54px)}
+
+/* ── SIDEBAR IZQ ── */
+.sb-izq{background:white;border-right:1px solid var(--bor);padding:1rem 0;overflow-y:auto}
+.sb-lbl{font-size:10px;font-weight:600;color:var(--gm);letter-spacing:1px;text-transform:uppercase;padding:0 1rem 5px}
+.sb-sec{padding:0 .6rem;margin-bottom:.75rem}
+.prof-chip{width:100%;display:flex;align-items:center;gap:7px;padding:6px 8px;border-radius:var(--r);border:none;background:none;cursor:pointer;font-family:'Inter',sans-serif;transition:.1s;border:1.5px solid transparent}
+.prof-chip:hover{background:var(--gc)}
+.prof-chip.active{background:var(--azul-p);border-color:var(--azul)}
+.prof-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+
+/* ── MAIN CENTER ── */
+.main-center{padding:1.25rem;overflow-y:auto}
+
+/* ── SIDEBAR DER ── */
+.sb-der{background:white;border-left:1px solid var(--bor);padding:1rem;overflow-y:auto}
+.sb-der-title{font-size:12px;font-weight:600;color:var(--gm);text-transform:uppercase;letter-spacing:.8px;margin-bottom:.75rem}
+.mini-cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem}
+.mc-nav-btn{background:none;border:none;cursor:pointer;color:var(--gm);font-size:16px;padding:0 4px}
+.mc-nav-btn:hover{color:var(--go)}
+#miniCalGrid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.mc-d{font-size:11px;text-align:center;padding:5px 2px;border-radius:5px;cursor:pointer;border:1.5px solid transparent;transition:.1s}
+.mc-d:hover{background:var(--azul-p);color:var(--azul)}
+.mc-d.hoy{background:var(--azul);color:white;font-weight:500}
+.mc-d.tiene{position:relative}
+.mc-d.tiene::after{content:'';position:absolute;bottom:1px;left:50%;transform:translateX(-50%);width:3px;height:3px;border-radius:50%;background:var(--verde)}
+/* Resumen stats sidebar der */
+.stat-mini{background:var(--gc);border-radius:var(--r);padding:.75rem;margin-bottom:.6rem}
+.stat-mini-val{font-size:22px;font-weight:600;color:var(--azul);line-height:1}
+.stat-mini-lbl{font-size:11px;color:var(--gm);margin-top:2px}
+/* Recordatorios sidebar der */
+.rec-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--bor)}
+.rec-row:last-child{border-bottom:none}
+.rec-ico{width:28px;height:28px;border-radius:7px;background:#dcf8c6;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.rec-n{font-size:12px;font-weight:500}
+.rec-d{font-size:10.5px;color:var(--gm)}
+.btn-wa-sm{background:#25D366;border:none;color:white;border-radius:5px;padding:3px 9px;font-size:11px;cursor:pointer;font-family:'Inter',sans-serif;font-weight:500;text-decoration:none;display:inline-block}
+.btn-wa-sm:hover{background:#1eb857}
+
+/* ── VISTAS ── */
+.vista{display:none;flex-direction:column;flex:1}
+#vSec{display:flex}
+
+/* ── TOOLBAR ── */
+.toolbar{display:flex;align-items:center;gap:8px;margin-bottom:1rem;flex-wrap:wrap}
+.week-nav-wrap{display:flex;align-items:center;gap:6px;background:white;border:1px solid var(--bor);border-radius:var(--r);padding:5px 10px}
+.wnav-btn{background:none;border:none;cursor:pointer;color:var(--gm);font-size:18px;padding:0 3px}
+.wnav-btn:hover{color:var(--go)}
+.week-lbl{font-size:13px;font-weight:500;color:var(--go);min-width:180px;text-align:center}
+
+/* ── AGENDA ── */
+.agenda-wrap{background:white;border-radius:var(--rl);border:1px solid var(--bor);box-shadow:var(--sh);overflow:hidden;margin-bottom:1.25rem}
+.ag-head{display:grid;border-bottom:1px solid var(--bor)}
+.ag-body{overflow-y:auto;max-height:420px}
+.ag-row{display:grid;border-bottom:1px solid var(--bor);min-height:56px}
+.ag-row:last-child{border-bottom:none}
+.ag-time{padding:5px 8px 0;font-size:11px;color:var(--gm);text-align:right;border-right:1px solid var(--bor);white-space:nowrap;width:64px}
+.ag-dhdr{padding:7px 4px;text-align:center;border-left:1px solid var(--bor)}
+.ag-dhdr:first-child{border-left:none}
+.ag-dhdr.hoy{background:var(--azul-p)}
+.ag-dnom{font-size:10px;font-weight:600;color:var(--gm);text-transform:uppercase;letter-spacing:.3px}
+.ag-dnum{font-size:17px;font-weight:500;color:var(--go);margin-top:1px}
+.ag-dnum.hoy-n{background:var(--azul);color:white;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:1px auto 0;font-size:13px}
+.ag-cell{border-left:1px solid var(--bor);padding:3px;cursor:pointer;transition:.1s;min-height:56px}
+.ag-cell:hover{background:rgba(26,78,122,.03)}
+.ag-cell.hoy{background:rgba(235,243,251,.3)}
+.tblk{border-radius:5px;padding:3px 6px;font-size:11px;line-height:1.3;cursor:pointer;margin-bottom:2px;border-left:3px solid;transition:.1s}
+.tblk:hover{filter:brightness(.95)}
+.tblk.sobre{border-left-color:#E24B4A!important;background:#FFE4E4!important}
+.tn{font-weight:500;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ti{font-size:10px;opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ── TURNOS HOY ── */
+.t-row{display:flex;align-items:center;gap:9px;padding:9px 1rem;border-bottom:1px solid var(--bor);cursor:pointer;transition:.1s}
+.t-row:last-child{border-bottom:none}
+.t-row:hover{background:var(--gc)}
+.t-row.sobre{background:#FFF5F5}
+.t-hora{font-size:12.5px;font-weight:500;color:var(--azul);min-width:40px}
+.t-pdot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.t-inf{flex:1}
+.t-nom{font-size:13px;font-weight:500}
+.t-det{font-size:11px;color:var(--gm);margin-top:1px}
+.pill{font-size:10px;padding:3px 8px;border-radius:20px;font-weight:500;white-space:nowrap}
+.pill.confirmado{background:var(--verde-p);color:#0F6E56}
+.pill.cancelado{background:var(--rojo-p);color:#791F1F}
+.pill.sobre{background:#FFE4E4;color:#A32D2D;border:1px solid #E24B4A}
+
+/* ── CARDS ── */
+.card{background:white;border-radius:var(--rl);border:1px solid var(--bor);box-shadow:var(--sh);overflow:hidden}
+.card-hdr{padding:.85rem 1rem;border-bottom:1px solid var(--bor);display:flex;align-items:center;justify-content:space-between}
+.card-title{font-size:13.5px;font-weight:500}
+
+/* ── BOTONES ── */
+.btn-primary{background:var(--azul);border:none;color:white;border-radius:var(--r);padding:8px 16px;font-size:13px;cursor:pointer;font-weight:500;display:flex;align-items:center;gap:6px;font-family:'Inter',sans-serif}
+.btn-primary:hover{background:var(--azul-m)}
+.btn-sec{background:white;border:1px solid var(--bor);color:var(--go);border-radius:var(--r);padding:7px 13px;font-size:12.5px;cursor:pointer;font-family:'Inter',sans-serif}
+.btn-sec:hover{background:var(--gc)}
+.btn-wa{background:#25D366;border:none;color:white;border-radius:var(--r);padding:7px 13px;font-size:12.5px;cursor:pointer;font-weight:500;display:flex;align-items:center;gap:5px;font-family:'Inter',sans-serif}
+.btn-wa:hover{background:#1eb857}
+
+/* ── FORMULARIOS ── */
+.fg{margin-bottom:.8rem}
+.flbl{font-size:11px;font-weight:500;color:var(--gm);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;display:block}
+.finput,.fselect{width:100%;border:1.5px solid var(--bor);border-radius:var(--r);padding:8px 11px;font-size:13.5px;color:var(--go);font-family:'Inter',sans-serif;outline:none;transition:border-color .15s;background:white}
+.finput:focus,.fselect:focus{border-color:var(--azul-m);box-shadow:0 0 0 3px rgba(26,78,122,.07)}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+/* ── SLOTS ── */
+.slots-g{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;max-height:150px;overflow-y:auto;padding:2px}
+.slot-m{padding:7px 4px;border-radius:7px;text-align:center;font-size:12px;cursor:pointer;border:1.5px solid var(--bor);background:white;font-family:'Inter',sans-serif;transition:.1s}
+.slot-m:hover:not([disabled]){border-color:var(--azul);color:var(--azul)}
+.slot-m.sel{background:var(--azul);color:white;border-color:var(--azul)}
+.slot-m.ocup{background:var(--gc);color:var(--bor);text-decoration:line-through;cursor:not-allowed}
+.slot-none{font-size:12.5px;color:var(--gm);text-align:center;padding:.75rem;grid-column:span 4}
+
+/* ── BUSCADOR PACIENTE ── */
+.buscador-wrap{position:relative}
+#nBuscRes{position:absolute;top:100%;left:0;right:0;background:white;border:1px solid var(--bor);border-radius:var(--r);box-shadow:var(--sh);z-index:50;max-height:200px;overflow-y:auto}
+.bres-item{padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--bor);display:flex;flex-direction:column;gap:2px}
+.bres-item:last-child{border-bottom:none}
+.bres-item:hover{background:var(--azul-p)}
+
+/* ── MODALES ── */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200;align-items:center;justify-content:center}
+.overlay.open{display:flex}
+.modal{background:white;border-radius:var(--rl);width:500px;max-width:96vw;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.2);max-height:90vh;display:flex;flex-direction:column}
+.modal-wide{width:600px}
+.modal-hdr{background:var(--azul);color:white;padding:1rem 1.25rem;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.modal-title{font-size:15px;font-weight:500}
+.modal-close{background:rgba(255,255,255,.15);border:none;color:white;width:26px;height:26px;border-radius:50%;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center}
+.modal-body{padding:1.25rem;overflow-y:auto;flex:1}
+.modal-footer{padding:.85rem 1.25rem;border-top:1px solid var(--bor);display:flex;gap:7px;justify-content:flex-end;flex-shrink:0;flex-wrap:wrap}
+
+/* ── DETALLE ── */
+.pac-ava{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500;flex-shrink:0}
+.det-blk{margin-bottom:.75rem}
+.det-row{display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid var(--bor)}
+.det-row:last-child{border-bottom:none}
+.det-k{font-size:12px;color:var(--gm);min-width:90px}
+.det-v{font-size:13.5px;font-weight:500}
+.hist-row{display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:1px solid var(--bor)}
+.hist-row:last-child{border-bottom:none}
+
+/* ── VISTA MÉDICO ── */
+.doc-cols{display:grid;grid-template-columns:1fr 230px;gap:1.25rem}
+.dtab{padding:6px 9px;border-radius:7px;border:none;background:none;font-size:12px;cursor:pointer;color:var(--gm);font-family:'Inter',sans-serif;white-space:nowrap;transition:.12s;position:relative;text-align:center;display:flex;flex-direction:column;align-items:center;gap:2px}
+.dtab:hover:not(.nodis){background:var(--gc);color:var(--go)}
+.dtab.nodis{opacity:.3;cursor:not-allowed}
+.dtab-cnt{position:absolute;top:2px;right:2px;color:white;font-size:9px;width:14px;height:14px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.dt-item{display:flex;align-items:flex-start;gap:12px;padding:12px 1rem;border-bottom:1px solid var(--bor);cursor:pointer;transition:.1s}
+.dt-item:last-child{border-bottom:none}
+.dt-item:hover{background:var(--gc)}
+.dt-item.sobre{background:#FFF5F5}
+.dpill{padding:5px 12px;border-radius:20px;border:2px solid var(--bor);font-size:11.5px;cursor:pointer;background:white;font-family:'Inter',sans-serif;color:var(--gm);transition:.15s}
+.dpill:hover{border-color:currentColor}
+.slot-d{padding:7px 4px;border-radius:7px;text-align:center;font-size:12px;border:1.5px solid var(--bor);background:var(--gc);color:var(--bor);font-size:11.5px}
+.slot-d.libre{font-weight:500}
+.slot-d.ocupado{text-decoration:line-through}
+
+/* ── GESTION ── */
+.gestion-row{display:flex;align-items:center;gap:12px;padding:12px 1rem;border-bottom:1px solid var(--bor)}
+.gestion-row:last-child{border-bottom:none}
+.prof-ava-sm{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:white;flex-shrink:0}
+.hora-franja{display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap}
+
+/* ── MISC ── */
+.empty-msg{padding:1.5rem;text-align:center;font-size:13px;color:var(--gm)}
+.ml-auto{margin-left:auto}
+.hidden{display:none!important}
+.toast{position:fixed;bottom:1.5rem;right:1.5rem;background:var(--go);color:white;padding:10px 17px;border-radius:var(--r);font-size:13px;z-index:500;display:none;align-items:center;gap:8px;box-shadow:0 8px 24px rgba(0,0,0,.2);max-width:340px}
+.toast.show{display:flex;animation:tIn .25s ease}
+.toast.wa{border-left:4px solid #25D366}
+.toast.ok{border-left:4px solid var(--verde)}
+.toast.err{border-left:4px solid var(--rojo)}
+@keyframes tIn{from{transform:translateY(8px);opacity:0}to{transform:translateY(0);opacity:1}}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="appLogin">
+  <div class="login-card">
+    <div class="login-logo">Instituto Espejo</div>
+    <div class="login-sub">Sistema de gestión de turnos · San Rafael</div>
+    <div class="fg"><label class="flbl">Usuario</label><input class="finput" id="loginUser" placeholder="clinica espejo" onkeydown="if(event.key==='Enter')_login()"></div>
+    <div class="fg"><label class="flbl">Contraseña</label><input class="finput" type="password" id="loginPwd" placeholder="••••••••" onkeydown="if(event.key==='Enter')_login()"></div>
+    <div class="login-err" id="loginErr"></div>
+    <button class="btn-primary" style="width:100%;justify-content:center;margin-top:.5rem" onclick="_login()">Ingresar</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="appMain">
+
+  <!-- HEADER -->
+  <header class="hdr">
+    <div class="hdr-logo">
+      <div class="hdr-logo-i"><svg viewBox="0 0 20 20"><path d="M10 2C5.6 2 2 5.6 2 10s3.6 8 8 8 8-3.6 8-8-3.6-8-8-8zm0 3c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm0 11.2c-2.7 0-5-1.4-6.4-3.4.1-2.1 4.3-3.3 6.4-3.3 2.1 0 6.3 1.2 6.4 3.3-1.4 2-3.7 3.4-6.4 3.4z"/></svg></div>
+      <div><div class="hdr-title">Instituto Espejo</div><span class="hdr-sub-t">Sistema de turnos</span></div>
+    </div>
+    <nav class="hdr-nav">
+      <button class="nav-btn active" id="nb-sec" onclick="_switchVista('sec')">Secretaría</button>
+      <button class="nav-btn" id="nb-doc" onclick="_switchVista('doc')">Vista médico</button>
+      <button class="nav-btn" id="nb-gestion" onclick="_switchVista('gestion')">Gestión</button>
+    </nav>
+    <div class="hdr-right">
+      <span class="hdr-tel">☎️ 2604-396462</span>
+      <button class="btn-sec" style="font-size:11.5px;padding:5px 12px" onclick="_logout()">Salir</button>
+    </div>
+  </header>
+
+  <!-- ══ SECRETARÍA ══ -->
+  <div id="vSec" class="vista" style="display:flex">
+    <div class="app-body">
+
+      <!-- Sidebar izq: profesionales -->
+      <aside class="sb-izq">
+        <div class="sb-sec">
+          <div class="sb-lbl">Profesionales</div>
+          <div id="profList"></div>
+        </div>
+      </aside>
+
+      <!-- Centro: agenda -->
+      <main class="main-center">
+        <!-- Toolbar -->
+        <div class="toolbar">
+          <div class="week-nav-wrap">
+            <button class="wnav-btn" onclick="_cambiarSemana(-1)">‹</button>
+            <span class="week-lbl" id="weekLbl">cargando...</span>
+            <button class="wnav-btn" onclick="_cambiarSemana(1)">›</button>
+          </div>
+          <button class="btn-sec" onclick="_irHoy()">Hoy</button>
+          <div class="ml-auto"></div>
+          <button class="btn-primary" onclick="_abrirNuevo()">
+            <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="white" stroke-width="2.2"><path d="M7 2v10M2 7h10"/></svg>
+            Nuevo turno
+          </button>
+        </div>
+
+        <!-- Agenda semanal -->
+        <div class="agenda-wrap">
+          <div class="ag-head" id="agHead" style="grid-template-columns:64px repeat(6,1fr)"></div>
+          <div class="ag-body" id="agBody"></div>
+        </div>
+
+        <!-- Turnos de hoy -->
+        <div class="card">
+          <div class="card-hdr">
+            <span class="card-title">Turnos de hoy</span>
+            <span style="font-size:11.5px;color:var(--gm)" id="cntHoy"></span>
+          </div>
+          <div id="turnosHoyList"></div>
+        </div>
+      </main>
+
+      <!-- Sidebar der: mini cal + stats + recordatorios -->
+      <aside class="sb-der">
+        <!-- Mini calendario -->
+        <div class="sb-der-title">Calendario</div>
+        <div class="mini-cal-nav">
+          <button class="mc-nav-btn" onclick="_miniCalNav(-1)">‹</button>
+          <span style="font-size:12px;font-weight:500" id="miniCalTit"></span>
+          <button class="mc-nav-btn" onclick="_miniCalNav(1)">›</button>
+        </div>
+        <div id="miniCalGrid" style="margin-bottom:1.25rem"></div>
+
+        <!-- Stats resumen -->
+        <div class="sb-der-title">Resumen</div>
+        <div class="stat-mini"><div class="stat-mini-val" id="statHoy">—</div><div class="stat-mini-lbl">Turnos hoy</div></div>
+        <div class="stat-mini"><div class="stat-mini-val" id="statManana">—</div><div class="stat-mini-lbl">Turnos mañana</div></div>
+        <div class="stat-mini"><div class="stat-mini-val" id="statSem">—</div><div class="stat-mini-lbl">Esta semana</div></div>
+
+        <!-- Recordatorios -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin:.75rem 0 .5rem">
+          <div class="sb-der-title" style="margin:0">Recordatorios</div>
+          <span style="font-size:10.5px;color:var(--gm)" id="recCnt"></span>
+        </div>
+        <button class="btn-wa" style="width:100%;justify-content:center;margin-bottom:.75rem;font-size:12px" onclick="_enviarTodosWA()">
+          <svg width="13" height="13" viewBox="0 0 20 20" fill="white"><path d="M10 1C5 1 1 5 1 10c0 1.8.5 3.4 1.3 4.8L1 19l4.3-1.3A9 9 0 1 0 10 1z"/></svg>
+          Enviar todos (mañana)
+        </button>
+        <div id="recList"></div>
+      </aside>
+
+    </div>
+  </div>
+
+  <!-- ══ VISTA MÉDICO ══ -->
+  <div id="vDoc" class="vista">
+    <div style="padding:1.25rem;flex:1;overflow-y:auto">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:1rem">
+        <div>
+          <div style="font-size:16px;font-weight:500" id="docNombreEl">—</div>
+          <div style="font-size:12.5px;color:var(--gm)" id="docEspEl">—</div>
+        </div>
+        <div class="ml-auto"></div>
+        <div style="font-size:12px;color:var(--gm)">Turnos hoy: <strong id="docStatHoy">—</strong></div>
+        <button class="btn-primary" onclick="_abrirNuevo()">+ Nuevo turno</button>
+      </div>
+      <!-- Selector profesional -->
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:1.25rem;padding-bottom:1rem;border-bottom:1px solid var(--bor)" id="docPills"></div>
+      <!-- Cols -->
+      <div class="doc-cols">
+        <div class="card">
+          <div class="card-hdr">
+            <div style="display:flex;gap:2px;overflow-x:auto" id="docDayTabs"></div>
+          </div>
+          <div id="docTurnosList"></div>
+        </div>
+        <div>
+          <div class="card" style="margin-bottom:1rem">
+            <div class="card-hdr"><span class="card-title">Disponibilidad</span></div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:.85rem" id="docSlotsEl"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ GESTIÓN ══ -->
+  <div id="vGestion" class="vista">
+    <div style="padding:1.25rem;flex:1;overflow-y:auto">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem">
+        <div><div style="font-size:16px;font-weight:500">Gestión de profesionales</div><div style="font-size:13px;color:var(--gm);margin-top:2px">Editá horarios, agregá o eliminá profesionales</div></div>
+        <button class="btn-primary">+ Nuevo profesional</button>
+      </div>
+      <div class="card"><div id="gestionList"></div></div>
+    </div>
+  </div>
+
+</div><!-- /appMain -->
+
+<!-- MODAL NUEVO TURNO -->
+<div class="overlay" id="modalNuevo">
+  <div class="modal modal-wide">
+    <div class="modal-hdr"><span class="modal-title">Nuevo turno</span><button class="modal-close" onclick="cerrarModal('modalNuevo')">×</button></div>
+    <div class="modal-body">
+      <!-- Buscador paciente -->
+      <div class="fg">
+        <label class="flbl">Buscar paciente existente</label>
+        <div class="buscador-wrap">
+          <input class="finput" id="nBuscador" placeholder="Escribí apellido o DNI..." oninput="_buscarPaciente(this.value)">
+          <div id="nBuscRes"></div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--gm);margin:-4px 0 10px;text-align:center">— o completá los datos del paciente —</div>
+      <div class="frow">
+        <div class="fg"><label class="flbl">Nombre</label><input class="finput" id="nPacNombre" placeholder="Nombre"></div>
+        <div class="fg"><label class="flbl">Apellido</label><input class="finput" id="nPacApellido" placeholder="Apellido"></div>
+      </div>
+      <div class="frow">
+        <div class="fg"><label class="flbl">DNI</label><input class="finput" id="nPacDni" placeholder="Número de documento"></div>
+        <div class="fg"><label class="flbl">Teléfono / WhatsApp</label><input class="finput" id="nPacTel" placeholder="2604xxxxxx"></div>
+      </div>
+      <div class="fg"><label class="flbl">Profesional</label><select class="fselect" id="nProf" onchange="_actualizarSlots()"></select></div>
+      <div class="frow">
+        <div class="fg"><label class="flbl">Fecha</label><input class="finput" type="date" id="nFecha" onchange="_actualizarSlots()"></div>
+        <div class="fg"><label class="flbl">Servicio / Motivo</label><input class="finput" id="nServ" placeholder="Ej: Consulta, Ortodoncia..."></div>
+      </div>
+      <div class="fg">
+        <label class="flbl">Horario disponible</label>
+        <div class="slots-g" id="nSlotsGrid"><div class="slot-none">Seleccioná profesional y fecha</div></div>
+        <input type="hidden" id="nHora">
+      </div>
+      <div class="fg"><label class="flbl">Nota / Observaciones</label><textarea class="finput" id="nNota" style="min-height:50px;resize:vertical" placeholder="Observaciones internas..."></textarea></div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:8px;background:var(--rojo-p);border-radius:var(--r)">
+        <input type="checkbox" id="nSobre"> <span><strong>Sobreturno</strong> — se agrega aunque el horario esté ocupado (se marca en rojo)</span>
+      </label>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-sec" onclick="cerrarModal('modalNuevo')">Cancelar</button>
+      <button class="btn-primary" onclick="_guardarTurno()">Guardar turno</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DETALLE -->
+<div class="overlay" id="modalDet">
+  <div class="modal modal-wide">
+    <div class="modal-hdr"><span class="modal-title" id="detTitle">Detalle</span><button class="modal-close" onclick="cerrarModal('modalDet')">×</button></div>
+    <div class="modal-body" id="detBody"></div>
+    <div class="modal-footer" id="detFooter"></div>
+  </div>
+</div>
+
+<!-- MODAL EDITAR PROFESIONAL -->
+<div class="overlay" id="modalEditProf">
+  <div class="modal modal-wide">
+    <div class="modal-hdr"><span class="modal-title">Editar profesional</span><button class="modal-close" onclick="cerrarModal('modalEditProf')">×</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="epId">
+      <div class="frow">
+        <div class="fg"><label class="flbl">Apellido</label><input class="finput" id="epApellido"></div>
+        <div class="fg"><label class="flbl">Nombre</label><input class="finput" id="epNombre"></div>
+      </div>
+      <div class="frow">
+        <div class="fg"><label class="flbl">Especialidad</label><input class="finput" id="epEsp"></div>
+        <div class="fg"><label class="flbl">Duración turno (min)</label><input class="finput" type="number" id="epDur" min="10" max="120"></div>
+      </div>
+      <div class="fg"><label class="flbl">Color identificador</label><input type="color" id="epColor" style="height:36px;width:60px;border-radius:6px;border:1px solid var(--bor);padding:2px"></div>
+      <div class="fg">
+        <label class="flbl">Franjas horarias</label>
+        <div id="epHorarios"></div>
+        <button class="btn-sec" style="margin-top:6px;font-size:12px" onclick="_agregarFranja()">+ Agregar franja</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-sec" onclick="cerrarModal('modalEditProf')">Cancelar</button>
+      <button class="btn-primary" onclick="_guardarProf()">Guardar cambios</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toastEl"><span id="toastMsg"></span></div>
+
+</body>
+</html>
