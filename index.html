@@ -448,7 +448,7 @@ function renderAgenda() {
           style="background:${t.esSobreturno?'#FFE4E4':'${p?.light||"#eee"}'};border-left-color:${t.esSobreturno?'#E24B4A':p?.color||'#888'}"
           onclick="_verDetalle('${t.id}')">
           <div class="tn">${t.pacNombre.split(' ')[0]} ${t.esSobreturno?'<span style="font-size:9px;background:#E24B4A;color:white;border-radius:3px;padding:0 3px">ST</span>':''}</div>
-          <div class="ti">${p?.apellido||''}</div>
+          <div class="ti">${p?.apellido||''} ${p?.nombre||''}</div>
         </div>`;
       }).join('');
       // celda clickeable para nuevo turno
@@ -478,7 +478,7 @@ function renderTurnosHoy() {
       <div class="t-pdot" style="background:${p?.color||'#888'}"></div>
       <div class="t-inf">
         <div class="t-nom">${t.pacNombre}</div>
-        <div class="t-det">${t.servicio||'—'} · ${p?.apellido||'—'}</div>
+        <div class="t-det">${t.servicio||'—'} · ${p?.nombre||''} ${p?.apellido||'—'}</div>
       </div>
       ${t.esSobreturno?'<span class="pill sobre">Sobreturno</span>':''}
       <span class="pill confirmado">Confirmado</span>
@@ -505,7 +505,7 @@ function renderRecordatorios() {
       <div class="rec-ico">${waIco}</div>
       <div style="flex:1">
         <div class="rec-n">${t.pacNombre}</div>
-        <div class="rec-d">${t.hora} · ${p?.apellido||''}</div>
+        <div class="rec-d">${t.hora} · ${p?.nombre||''} ${p?.apellido||''}</div>
       </div>
       <a href="https://wa.me/549${t.pacTel}?text=${msg}" target="_blank" class="btn-wa-sm">Enviar</a>
     </div>`;
@@ -538,7 +538,7 @@ function renderSidebar() {
   profs.forEach(p=>{
     el.innerHTML+=`<button class="prof-chip${profSelAgenda===p.id?' active':''}" onclick="_filtrarProf('${p.id}')" style="--pc:${p.color}">
       <div class="prof-dot" style="background:${p.color}"></div>
-      <div style="flex:1;text-align:left"><div style="font-size:11.5px;font-weight:500;color:var(--go)">${p.apellido}</div><div style="font-size:10px;color:var(--gm)">${p.esp}</div></div>
+      <div style="flex:1;text-align:left"><div style="font-size:11px;font-weight:500;color:var(--go)">${p.apellido}${p.nombre?', '+p.nombre:''}</div><div style="font-size:10px;color:var(--gm)">${p.esp}</div></div>
     </button>`;
   });
 }
@@ -579,7 +579,7 @@ function abrirModalNuevo(fecha='', hora='') {
   limpiarFormNuevo();
   // poblar select prof
   const sel=document.getElementById('nProf');
-  sel.innerHTML=profs.map(p=>`<option value="${p.id}">${p.apellido}${p.nombre?' - '+p.nombre:''}</option>`).join('');
+  sel.innerHTML=profs.map(p=>`<option value="${p.id}">${p.apellido}${p.nombre?', '+p.nombre:''} — ${p.esp}</option>`).join('');
   // poblar servicios
   document.getElementById('nServ').value='Consulta';
   if(fecha) document.getElementById('nFecha').value=fecha;
@@ -665,7 +665,7 @@ window._verDetalle = async function(id) {
     </div>
     <div class="det-blk">
       <div class="det-row"><span class="det-k">Fecha y hora</span><span class="det-v">${labelF(t.fecha)} · ${t.hora} hs</span></div>
-      <div class="det-row"><span class="det-k">Profesional</span><span class="det-v" style="color:${p?.color}">${p?.nombre} ${p?.apellido||'—'}</span></div>
+      <div class="det-row"><span class="det-k">Profesional</span><span class="det-v" style="color:${p?.color}">${p?.apellido||''}, ${p?.nombre||'—'}</span></div>
       <div class="det-row"><span class="det-k">Especialidad</span><span class="det-v">${p?.esp||'—'}</span></div>
       <div class="det-row"><span class="det-k">Servicio</span><span class="det-v">${t.servicio||'—'}</span></div>
       <div class="det-row"><span class="det-k">Nota</span><span class="det-v">${t.nota||'—'}</span></div>
@@ -732,7 +732,7 @@ function initVistaMedico() {
 function renderDocPills() {
   document.getElementById('docPills').innerHTML=profs.map(p=>`
     <button class="dpill${profSelDoc===p.id?' active':''}" style="--pc:${p.color};${profSelDoc===p.id?`background:${p.color};color:white;border-color:${p.color}`:''}" onclick="_selDoc('${p.id}')">
-      ${p.apellido}
+      ${p.apellido}${p.nombre?', '+p.nombre:''}
     </button>
   `).join('');
 }
@@ -964,6 +964,210 @@ window._irHoy=()=>{ offSemana=0; renderAgenda(); };
 // Mini cal init
 renderMiniCal();
 setInterval(renderMiniCal, 60000);
+
+// ══════════════════════════════════════════════
+//  PACIENTES — VISTA COMPLETA
+// ══════════════════════════════════════════════
+
+function renderPacientesLista(lista) {
+  const el = document.getElementById('pacLista');
+  document.getElementById('pacTotal').textContent = lista.length + ' paciente' + (lista.length!==1?'s':'');
+  if(!lista.length) {
+    el.innerHTML = '<div class="empty-msg">No hay pacientes registrados aún</div>';
+    return;
+  }
+  el.innerHTML = lista.map(p => {
+    const ini = ((p.apellido||'').charAt(0) + (p.nombre||'').charAt(0)).toUpperCase();
+    const ultTurno = turnos.filter(t=>t.pacienteId===p.id&&t.estado!=='cancelado').sort((a,b)=>b.fecha.localeCompare(a.fecha))[0];
+    const cantTurnos = turnos.filter(t=>t.pacienteId===p.id&&t.estado!=='cancelado').length;
+    return `<div class="t-row" onclick="_verFicha('${p.id}')">
+      <div style="width:36px;height:36px;border-radius:50%;background:var(--azul-p);color:var(--azul);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;flex-shrink:0">${ini}</div>
+      <div class="t-inf" style="flex:1">
+        <div class="t-nom">${p.apellido||''}, ${p.nombre||''}</div>
+        <div class="t-det">DNI: ${p.dni||'—'} · ${p.telefono||'Sin teléfono'}${p.obraSocial?' · '+p.obraSocial:''}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-size:12px;font-weight:500;color:var(--azul)">${cantTurnos} turno${cantTurnos!==1?'s':''}</div>
+        <div style="font-size:11px;color:var(--gm);margin-top:1px">${ultTurno?'Últ: '+labelF(ultTurno.fecha):'Sin turnos'}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+window._buscarEnPacientes = function(q) {
+  const res = document.getElementById('pacBuscRes');
+  if(!q || q.length < 2) { res.style.display='none'; return; }
+  const hits = pacientes.filter(p =>
+    (p.apellido+' '+p.nombre).toLowerCase().includes(q.toLowerCase()) ||
+    (p.nombre+' '+p.apellido).toLowerCase().includes(q.toLowerCase()) ||
+    (p.dni&&p.dni.includes(q))
+  ).slice(0, 8);
+  if(!hits.length) {
+    res.style.display='block';
+    res.innerHTML='<div class="bres-item" style="color:var(--gm)">Sin resultados</div>';
+    return;
+  }
+  res.style.display='block';
+  res.innerHTML = hits.map(p => `
+    <div class="bres-item" onclick="_verFicha('${p.id}');document.getElementById('pacBuscRes').style.display='none'">
+      <strong>${p.apellido}, ${p.nombre}</strong>
+      <span style="font-size:11px;color:var(--gm)">DNI: ${p.dni||'—'} · ${p.telefono||'—'}</span>
+    </div>
+  `).join('');
+};
+
+window._verFicha = function(pacId) {
+  const p = pacientes.find(x=>x.id===pacId);
+  if(!p) return;
+  const historial = turnos
+    .filter(t=>t.pacienteId===pacId)
+    .sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  const ini = ((p.apellido||'').charAt(0)+(p.nombre||'').charAt(0)).toUpperCase();
+  
+  document.getElementById('fichaTitle').textContent = p.apellido+', '+p.nombre;
+  document.getElementById('fichaBody').innerHTML = `
+    <!-- Datos del paciente -->
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:1.25rem;padding-bottom:1rem;border-bottom:1px solid var(--bor)">
+      <div style="width:50px;height:50px;border-radius:50%;background:var(--azul-p);color:var(--azul);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:500;flex-shrink:0">${ini}</div>
+      <div style="flex:1">
+        <div style="font-size:16px;font-weight:500">${p.apellido||''}, ${p.nombre||''}</div>
+        <div style="font-size:12.5px;color:var(--gm);margin-top:3px;display:flex;gap:14px;flex-wrap:wrap">
+          ${p.dni?`<span>🪪 DNI ${p.dni}</span>`:''}
+          ${p.telefono?`<span>📱 ${p.telefono}</span>`:''}
+          ${p.email?`<span>✉️ ${p.email}</span>`:''}
+          ${p.fechaNac?`<span>🎂 ${p.fechaNac}</span>`:''}
+          ${p.obraSocial?`<span>🏥 ${p.obraSocial}</span>`:''}
+        </div>
+      </div>
+    </div>
+    ${p.antecedentes?`
+    <div style="background:var(--ambar-p);border-radius:var(--r);padding:.85rem;margin-bottom:1rem;font-size:13px;border-left:3px solid var(--ambar)">
+      <div style="font-size:10px;font-weight:600;color:var(--ambar);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Antecedentes / Alergias</div>
+      ${p.antecedentes}
+    </div>`:''}
+    <!-- Historial -->
+    <div style="font-size:11px;font-weight:600;color:var(--gm);text-transform:uppercase;letter-spacing:.6px;margin-bottom:.75rem">
+      Historial de visitas · ${historial.length} turno${historial.length!==1?'s':''}
+    </div>
+    ${historial.length ? historial.map(t=>{
+      const prof = gProf(t.profesionalId);
+      return `<div style="border:1px solid var(--bor);border-radius:var(--r);padding:.85rem;margin-bottom:.6rem;${t.esSobreturno?'border-left:3px solid var(--rojo)':''}">
+        <div style="display:flex;align-items:flex-start;gap:10px">
+          <div style="flex:1">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <span style="font-size:13.5px;font-weight:500">${labelF(t.fecha)}</span>
+              <span style="font-size:12px;color:var(--gm)">${t.hora} hs</span>
+              <span style="font-size:11px;padding:2px 8px;border-radius:12px;background:${prof?prof.light:'#eee'};color:${prof?prof.color:'#888'};font-weight:500">${prof?prof.apellido:'—'}</span>
+              ${t.esSobreturno?'<span class="pill sobre">Sobreturno</span>':''}
+              <span class="pill ${t.estado}">${t.estado.charAt(0).toUpperCase()+t.estado.slice(1)}</span>
+            </div>
+            <div style="font-size:12.5px;color:var(--gm);margin-top:4px">${t.servicio||'—'}</div>
+            ${t.nota?`<div style="font-size:12.5px;color:var(--go);margin-top:6px;padding-top:6px;border-top:1px solid var(--bor)">
+              <span style="font-size:10px;font-weight:600;color:var(--gm);text-transform:uppercase;letter-spacing:.4px">Nota clínica: </span>${t.nota}
+            </div>`:''}
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">
+            <button class="btn-sec" style="font-size:11px;padding:4px 10px" onclick="_agregarNota('${t.id}','${pacId}')">✏️ Nota</button>
+            ${t.pacTel?`<a href="https://wa.me/549${t.pacTel}" target="_blank" class="btn-wa-sm" style="text-align:center">WA</a>`:''}
+          </div>
+        </div>
+      </div>`;
+    }).join('') : '<div class="empty-msg">Sin historial de visitas</div>'}
+    <!-- Nueva nota general -->
+    <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--bor)">
+      <label class="flbl">Agregar nota general al paciente</label>
+      <textarea class="finput" id="fichaNotaGen" style="min-height:60px;resize:vertical;margin-top:4px" placeholder="Observaciones generales, indicaciones, etc...">${p.notaGeneral||''}</textarea>
+    </div>
+  `;
+  document.getElementById('fichaFooter').innerHTML = `
+    <button class="btn-sec" onclick="cerrarModal('modalFicha')">Cerrar</button>
+    <button class="btn-sec" onclick="_editarPaciente('${pacId}')">✏️ Editar datos</button>
+    <button class="btn-primary" onclick="_guardarNotaGeneral('${pacId}')">💾 Guardar nota</button>
+    <button class="btn-primary" onclick="cerrarModal('modalFicha');_abrirNuevo()">+ Nuevo turno</button>
+  `;
+  abrirModal('modalFicha');
+};
+
+window._agregarNota = function(turnoId, pacId) {
+  const nota = prompt('Nota clínica para este turno:');
+  if(nota !== null) {
+    updateDoc(doc(db,'turnos',turnoId), { nota }).then(()=>{
+      toast('Nota guardada','ok');
+      setTimeout(()=>_verFicha(pacId), 500);
+    });
+  }
+};
+
+window._guardarNotaGeneral = async function(pacId) {
+  const nota = document.getElementById('fichaNotaGen').value.trim();
+  await updateDoc(doc(db,'pacientes',pacId), { notaGeneral: nota });
+  toast('Nota guardada','ok');
+};
+
+window._nuevoPaciente = function() {
+  document.getElementById('npacId').value='';
+  document.getElementById('npacTitle').textContent='Nuevo paciente';
+  ['npacNom','npacApe','npacDni','npacTel','npacEmail','npacOs','npacAnte'].forEach(id=>{ document.getElementById(id).value=''; });
+  document.getElementById('npacFecNac').value='';
+  abrirModal('modalNuevoPac');
+};
+
+window._editarPaciente = function(pacId) {
+  const p = pacientes.find(x=>x.id===pacId); if(!p) return;
+  document.getElementById('npacId').value=pacId;
+  document.getElementById('npacTitle').textContent='Editar paciente';
+  document.getElementById('npacNom').value=p.nombre||'';
+  document.getElementById('npacApe').value=p.apellido||'';
+  document.getElementById('npacDni').value=p.dni||'';
+  document.getElementById('npacTel').value=p.telefono||'';
+  document.getElementById('npacEmail').value=p.email||'';
+  document.getElementById('npacFecNac').value=p.fechaNac||'';
+  document.getElementById('npacOs').value=p.obraSocial||'';
+  document.getElementById('npacAnte').value=p.antecedentes||'';
+  cerrarModal('modalFicha');
+  abrirModal('modalNuevoPac');
+};
+
+window._guardarPaciente = async function() {
+  const id = document.getElementById('npacId').value;
+  const nom = document.getElementById('npacNom').value.trim();
+  const ape = document.getElementById('npacApe').value.trim();
+  if(!nom && !ape) { toast('Ingresá al menos nombre o apellido','err'); return; }
+  const data = {
+    nombre: nom, apellido: ape,
+    dni: document.getElementById('npacDni').value.trim(),
+    telefono: document.getElementById('npacTel').value.trim(),
+    email: document.getElementById('npacEmail').value.trim(),
+    fechaNac: document.getElementById('npacFecNac').value,
+    obraSocial: document.getElementById('npacOs').value.trim(),
+    antecedentes: document.getElementById('npacAnte').value.trim(),
+  };
+  if(id) {
+    await updateDoc(doc(db,'pacientes',id), data);
+    toast('Paciente actualizado','ok');
+  } else {
+    data.creadoEn = serverTimestamp();
+    await addDoc(collection(db,'pacientes'), data);
+    toast('Paciente creado','ok');
+  }
+  cerrarModal('modalNuevoPac');
+  renderPacientesLista(pacientes);
+};
+
+// Render inicial de pacientes cuando se entra a la vista
+const _origSwitch = window._switchVista;
+window._switchVista = function(v) {
+  document.querySelectorAll('.vista').forEach(el=>el.style.display='none');
+  const vId = 'v'+v.charAt(0).toUpperCase()+v.slice(1);
+  const el = document.getElementById(vId);
+  if(el) el.style.display='flex';
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  const nbEl = document.getElementById('nb-'+v);
+  if(nbEl) nbEl.classList.add('active');
+  if(v==='doc') initVistaMedico();
+  if(v==='gestion') renderGestion();
+  if(v==='pac') renderPacientesLista(pacientes);
+};
 
 </script>
 
@@ -1207,6 +1411,7 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
     <nav class="hdr-nav">
       <button class="nav-btn active" id="nb-sec" onclick="_switchVista('sec')">Secretaría</button>
       <button class="nav-btn" id="nb-doc" onclick="_switchVista('doc')">Vista médico</button>
+      <button class="nav-btn" id="nb-pac" onclick="_switchVista('pac')">Pacientes</button>
       <button class="nav-btn" id="nb-gestion" onclick="_switchVista('gestion')">Gestión</button>
     </nav>
     <div class="hdr-right">
@@ -1335,6 +1540,30 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
     </div>
   </div>
 
+
+  <!-- ══ PACIENTES ══ -->
+  <div id="vPac" class="vista">
+    <div style="padding:1.25rem;flex:1;overflow-y:auto;max-width:960px;margin:0 auto;width:100%">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:.75rem">
+        <div>
+          <div style="font-size:16px;font-weight:500">Pacientes</div>
+          <div style="font-size:13px;color:var(--gm);margin-top:2px" id="pacSubtitle">Historial clínico y fichas de pacientes</div>
+        </div>
+        <button class="btn-primary" onclick="_nuevoPaciente()">+ Nuevo paciente</button>
+      </div>
+      <div style="position:relative;margin-bottom:1.25rem">
+        <input class="finput" id="pacBuscador" placeholder="🔍  Buscar por apellido, nombre o DNI..." oninput="_buscarEnPacientes(this.value)" style="font-size:14px;padding:11px 14px">
+        <div id="pacBuscRes" style="position:absolute;top:100%;left:0;right:0;background:white;border:1px solid var(--bor);border-radius:var(--r);box-shadow:var(--sh);z-index:50;max-height:280px;overflow-y:auto;display:none"></div>
+      </div>
+      <div id="pacContent">
+        <div class="card">
+          <div class="card-hdr"><span class="card-title">Todos los pacientes</span><span style="font-size:11.5px;color:var(--gm)" id="pacTotal"></span></div>
+          <div id="pacLista"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div><!-- /appMain -->
 
 <!-- MODAL NUEVO TURNO -->
@@ -1414,6 +1643,47 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
     <div class="modal-footer">
       <button class="btn-sec" onclick="cerrarModal('modalEditProf')">Cancelar</button>
       <button class="btn-primary" onclick="_guardarProf()">Guardar cambios</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- MODAL FICHA PACIENTE -->
+<div class="overlay" id="modalFicha">
+  <div class="modal" style="width:620px;max-width:96vw">
+    <div class="modal-hdr">
+      <span class="modal-title" id="fichaTitle">Ficha del paciente</span>
+      <button class="modal-close" onclick="cerrarModal('modalFicha')">×</button>
+    </div>
+    <div class="modal-body" id="fichaBody"></div>
+    <div class="modal-footer" id="fichaFooter"></div>
+  </div>
+</div>
+
+<!-- MODAL NUEVO/EDITAR PACIENTE -->
+<div class="overlay" id="modalNuevoPac">
+  <div class="modal">
+    <div class="modal-hdr"><span class="modal-title" id="npacTitle">Nuevo paciente</span><button class="modal-close" onclick="cerrarModal('modalNuevoPac')">×</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="npacId">
+      <div class="frow">
+        <div class="fg"><label class="flbl">Nombre</label><input class="finput" id="npacNom" placeholder="Nombre"></div>
+        <div class="fg"><label class="flbl">Apellido</label><input class="finput" id="npacApe" placeholder="Apellido"></div>
+      </div>
+      <div class="frow">
+        <div class="fg"><label class="flbl">DNI</label><input class="finput" id="npacDni" placeholder="Número de documento"></div>
+        <div class="fg"><label class="flbl">Fecha de nacimiento</label><input class="finput" type="date" id="npacFecNac"></div>
+      </div>
+      <div class="frow">
+        <div class="fg"><label class="flbl">Teléfono / WhatsApp</label><input class="finput" id="npacTel" placeholder="2604xxxxxx"></div>
+        <div class="fg"><label class="flbl">Email</label><input class="finput" id="npacEmail" placeholder="correo@email.com" type="email"></div>
+      </div>
+      <div class="fg"><label class="flbl">Obra social</label><input class="finput" id="npacOs" placeholder="Ej: OSDE, OSPAC, Particular..."></div>
+      <div class="fg"><label class="flbl">Antecedentes / Alergias</label><textarea class="finput" id="npacAnte" style="min-height:70px;resize:vertical" placeholder="Alergias, medicación habitual, antecedentes importantes..."></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-sec" onclick="cerrarModal('modalNuevoPac')">Cancelar</button>
+      <button class="btn-primary" onclick="_guardarPaciente()">Guardar</button>
     </div>
   </div>
 </div>
