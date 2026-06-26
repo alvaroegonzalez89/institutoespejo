@@ -881,7 +881,7 @@ function renderRecordatorios(){
   const waIco='<svg width="16" height="16" viewBox="0 0 20 20" fill="#25D366"><path d="M10 1C5 1 1 5 1 10c0 1.8.5 3.4 1.3 4.8L1 19l4.3-1.3A9 9 0 1 0 10 1z"/></svg>';
   const mkRow=(t)=>{
     const p=gProf(t.profesionalId);
-    const msg=encodeURIComponent(`Hola ${(t.pacNombre||'').split(' ')[0]} 👋 Te recordamos tu turno en *Instituto Espejo* mañana *${labelF(t.fecha)}* a las *${t.hora} hs* con *${p?p.nom+' '+p.ape:'el profesional'}*.\n📍 San Rafael, Mendoza · ☎ ${TEL}\nRespondé si necesitás cancelar. ¡Te esperamos! 😊`);
+    const msg=encodeURIComponent(`Hola ${(t.pacNombre||'').split(' ')[0]} 👋 Te recordamos tu turno en *Instituto Espejo* mañana *${labelF(t.fecha)}* a las *${t.hora} hs* con *${p?p.nom+' '+p.ape:'el profesional'}*.\n📍 San Rafael, Mendoza · ☎ ${TEL}\n\nPor favor confirmanos tu asistencia respondiendo este mensaje:\n✅ *SI* — Confirmo que asistiré\n❌ *NO* — No voy a poder asistir\n\n¡Te esperamos! 😊`);
     return `<div class="rec-row">
       <div class="rec-ico">${waIco}</div>
       <div style="flex:1;min-width:0">
@@ -903,7 +903,7 @@ function enviarTodosWA(){
   ts.forEach((t,i)=>{
     setTimeout(()=>{
       const p=gProf(t.profesionalId);
-      const msg=encodeURIComponent(`Hola ${(t.pacNombre||'').split(' ')[0]} 👋 Te recordamos tu turno en *Instituto Espejo* mañana *${labelF(t.fecha)}* a las *${t.hora} hs* con *${p?p.nom+' '+p.ape:'el profesional'}*.\n📍 San Rafael, Mendoza · ☎ ${TEL}\nRespondé si necesitás cancelar. ¡Te esperamos! 😊`);
+      const msg=encodeURIComponent(`Hola ${(t.pacNombre||'').split(' ')[0]} 👋 Te recordamos tu turno en *Instituto Espejo* mañana *${labelF(t.fecha)}* a las *${t.hora} hs* con *${p?p.nom+' '+p.ape:'el profesional'}*.\n📍 San Rafael, Mendoza · ☎ ${TEL}\n\nPor favor confirmanos tu asistencia respondiendo este mensaje:\n✅ *SI* — Confirmo que asistiré\n❌ *NO* — No voy a poder asistir\n\n¡Te esperamos! 😊`);
       window.open(`https://wa.me/549${t.pacTel}?text=${msg}`,'_blank');
     },i*900);
   });
@@ -1145,7 +1145,7 @@ function verDetalle(id){
       <div style="font-size:10.5px;font-weight:600;color:var(--gm);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">Historial del paciente</div>
       ${historial.map(h=>{const hp=gProf(h.profesionalId);return `<div class="hist-row"><span style="min-width:90px;color:var(--gm)">${labelF(h.fecha)}</span><span style="flex:1">${hp?.ape||'—'} · ${h.servicio||'—'}</span>${h.nota?`<span style="color:var(--ambar);font-style:italic;font-size:11px">${h.nota}</span>`:''}</div>`;}).join('')}
     </div>`:''}
-    <div class="wa-prev">Hola ${(t.pacNombre||'').split(' ')[0]} 👋 Te recordamos tu turno en Instituto Espejo el ${labelF(t.fecha)} a las ${t.hora} hs con ${p?p.nom+' '+p.ape:'el profesional'}.<br>📍 San Rafael, Mendoza · ¡Te esperamos! 😊</div>
+    <div class="wa-prev">Hola ${(t.pacNombre||'').split(' ')[0]} 👋 Te recordamos tu turno en Instituto Espejo el ${labelF(t.fecha)} a las ${t.hora} hs con ${p?p.nom+' '+p.ape:'el profesional'}.<br>📍 San Rafael, Mendoza · ☎ ${TEL}<br><br>Por favor confirmanos tu asistencia respondiendo este mensaje:<br>✅ <strong>SI</strong> — Confirmo que asistiré<br>❌ <strong>NO</strong> — No voy a poder asistir<br><br>¡Te esperamos! 😊</div>
     <div style="margin-top:.75rem">
       <label class="flbl">Nota clínica</label>
       <textarea class="finput" id="detNota" style="min-height:55px;resize:vertical;margin-top:4px">${t.nota||''}</textarea>
@@ -1166,7 +1166,7 @@ function verDetalle(id){
     <button class="btn-p" onclick="guardarDetalle('${t.id}')">💾 Guardar</button>
     ${t.pacTel?(()=>{
       const p2=gProf(t.profesionalId);
-      const msg=encodeURIComponent('Hola '+t.pacNombre.split(' ')[0]+' 👋 Te recordamos tu turno en *Instituto Espejo* el *'+labelF(t.fecha)+'* a las *'+t.hora+' hs* con *'+(p2?p2.nom+' '+p2.ape:'el profesional')+'*.\n📍 San Rafael, Mendoza · ☎ '+TEL+'\n¡Te esperamos! 😊');
+      const msg=encodeURIComponent('Hola '+t.pacNombre.split(' ')[0]+' 👋 Te recordamos tu turno en *Instituto Espejo* el *'+labelF(t.fecha)+'* a las *'+t.hora+' hs* con *'+(p2?p2.nom+' '+p2.ape:'el profesional')+'*.\n📍 San Rafael, Mendoza · ☎ '+TEL+'\n\nPor favor confirmanos tu asistencia respondiendo este mensaje:\n✅ *SI* — Confirmo que asistiré\n❌ *NO* — No voy a poder asistir\n\n¡Te esperamos! 😊');
       return `<a href="https://wa.me/549${t.pacTel}?text=${msg}" target="_blank" class="btn-wa">WA</a>`;
     })():''}
   `;
