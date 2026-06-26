@@ -87,20 +87,22 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
 
 /* AGENDA */
 .agenda-wrap{background:white;border-radius:var(--rl);border:1px solid var(--bor);box-shadow:var(--sh);overflow:hidden;margin-bottom:1rem}
-.ag-head{display:grid;border-bottom:1px solid var(--bor)}
-.ag-body{overflow-y:auto;overflow-x:auto;max-height:400px}
-.agenda-wrap{overflow-x:auto}
-.ag-row{display:grid;border-bottom:1px solid var(--bor);min-height:54px}
-.ag-row:last-child{border-bottom:none}
-.ag-time{padding:5px 6px 0;font-size:11px;color:var(--gm);text-align:right;border-right:1px solid var(--bor);width:58px;flex-shrink:0}
-.ag-dhdr{padding:7px 4px;text-align:center;border-left:1px solid var(--bor)}
-.ag-dhdr.hoy{background:var(--azulp)}
+.agenda-wrap{overflow:hidden;border-radius:var(--rl);border:1px solid var(--bor);box-shadow:var(--sh);margin-bottom:1rem;background:white}
+.ag-scroll{overflow-y:auto;overflow-x:hidden;max-height:420px}
+.ag-table{width:100%;border-collapse:collapse;table-layout:fixed}
+.ag-table th{padding:8px 4px;text-align:center;border-bottom:1px solid var(--bor);border-right:1px solid var(--bor);background:white;position:sticky;top:0;z-index:2}
+.ag-table th:first-child{width:58px;border-left:none}
+.ag-table th:last-child{border-right:none}
+.ag-table th.hoy{background:var(--azulp)}
 .ag-dnom{font-size:10px;font-weight:600;color:var(--gm);text-transform:uppercase;letter-spacing:.3px}
 .ag-dnum{font-size:16px;font-weight:500;color:var(--go);margin-top:1px}
 .ag-dnum.hoy-n{background:var(--azul);color:white;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:1px auto 0;font-size:13px}
-.ag-cell{border-left:1px solid var(--bor);padding:3px;cursor:pointer;transition:.1s;min-height:54px}
-.ag-cell:hover{background:rgba(26,78,122,.03)}
-.ag-cell.hoy{background:rgba(235,243,251,.3)}
+.ag-table td{border-bottom:1px solid var(--bor);border-right:1px solid var(--bor);vertical-align:top;padding:3px;cursor:pointer;transition:background .1s;min-height:54px;height:54px}
+.ag-table td:first-child{font-size:11px;color:var(--gm);text-align:right;padding:5px 6px 0;cursor:default;border-left:none;white-space:nowrap;width:58px}
+.ag-table td:last-child{border-right:none}
+.ag-table tr:last-child td{border-bottom:none}
+.ag-table td.hoy{background:rgba(235,243,251,.3)}
+.ag-table td:not(:first-child):hover{background:rgba(26,78,122,.03)}
 .tblk{border-radius:5px;padding:3px 6px;font-size:11px;line-height:1.3;cursor:pointer;margin-bottom:2px;border-left:3px solid;transition:.1s}
 .tblk:hover{filter:brightness(.93)}
 .tblk.sobre{border-left-color:#E24B4A!important;background:#FFE4E4!important}
@@ -295,10 +297,7 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
             Nuevo turno
           </button>
         </div>
-        <div class="agenda-wrap">
-          <div class="ag-head" id="agHead" style="grid-template-columns:58px repeat(6,1fr)"></div>
-          <div class="ag-body" id="agBody"></div>
-        </div>
+        <div class="agenda-wrap" id="agendaTableWrap"></div>
         <div class="btm-grid">
           <div class="card">
             <div class="card-hdr"><span class="card-t">Turnos de hoy</span><span style="font-size:11.5px;color:var(--gm)" id="cntHoy"></span></div>
@@ -799,28 +798,28 @@ function renderAgenda(){
   }
   const horas=[...horasSet].sort();
 
+  // Construir tabla completa
+  const wrap = document.getElementById('agendaTableWrap');
+  if(!horas.length){ wrap.innerHTML='<div class="empty">Sin horarios disponibles para esta semana</div>'; return; }
+
   // HEAD
-  const head=document.getElementById('agHead');
-  head.style.gridTemplateColumns='58px repeat(6,1fr)';
-  head.style.minWidth='600px';
-  head.innerHTML='<div style="width:58px;border-right:1px solid var(--bor)"></div>';
+  let thead = '<thead><tr><th style="width:58px"></th>';
   for(let i=0;i<6;i++){
     const d=new Date(lunes); d.setDate(lunes.getDate()+i);
     const fs=fStr(d); const esH=fs===HOY;
     const cnt=turnos.filter(t=>t.fecha===fs&&t.estado!=='cancelado'&&(profFiltro==='todos'||t.profesionalId===profFiltro)).length;
-    head.innerHTML+=`<div class="ag-dhdr${esH?' hoy':''}">
+    thead+=`<th class="${esH?'hoy':''}">
       <div class="ag-dnom">${DIAS_C[d.getDay()]}</div>
       ${esH?`<div class="ag-dnum hoy-n">${d.getDate()}</div>`:`<div class="ag-dnum">${d.getDate()}</div>`}
       ${cnt?`<div style="font-size:10px;color:var(--gm)">${cnt}t</div>`:''}
-    </div>`;
+    </th>`;
   }
+  thead += '</tr></thead>';
 
   // BODY
-  const body=document.getElementById('agBody');
-  if(!horas.length){ body.innerHTML='<div class="empty">Sin horarios disponibles para esta semana</div>'; return; }
-  body.innerHTML='';
+  let tbody = '<tbody>';
   horas.forEach(hora=>{
-    let row=`<div class="ag-row" style="grid-template-columns:58px repeat(6,1fr);min-width:600px"><div class="ag-time">${hora}</div>`;
+    tbody += `<tr><td>${hora}</td>`;
     for(let i=0;i<6;i++){
       const d=new Date(lunes); d.setDate(lunes.getDate()+i);
       const fs=fStr(d); const esH=fs===HOY;
@@ -834,11 +833,13 @@ function renderAgenda(){
           <div class="ti">${p?p.ape:''}</div>
         </div>`;
       }).join('');
-      row+=`<div class="ag-cell${esH?' hoy':''}" onclick="celdaClick('${fs}','${hora}')">${bloques}</div>`;
+      tbody+=`<td class="${esH?'hoy':''}" onclick="celdaClick('${fs}','${hora}')">${bloques}</td>`;
     }
-    row+='</div>';
-    body.innerHTML+=row;
+    tbody += '</tr>';
   });
+  tbody += '</tbody>';
+
+  wrap.innerHTML = `<div class="ag-scroll"><table class="ag-table">${thead}${tbody}</table></div>`;
 }
 
 function celdaClick(fecha, hora){
