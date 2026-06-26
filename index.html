@@ -52,7 +52,7 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
 .rb-lbl{font-size:10.5px;color:var(--gm)}
 
 /* LAYOUT SECRETARIA */
-.sec-layout{display:grid;grid-template-columns:195px 1fr 210px;flex:1;min-height:calc(100vh - 54px - 44px)}
+.sec-layout{display:grid;grid-template-columns:195px 1fr 215px;flex:1;min-height:calc(100vh - 54px - 44px)}
 
 /* SIDEBAR IZQ */
 .sb-izq{background:white;border-right:1px solid var(--bor);padding:.75rem 0;overflow-y:auto}
@@ -77,6 +77,7 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
 .mc-d:hover{background:var(--azulp);color:var(--azul)}
 .mc-d.hoy{background:var(--azul);color:white;font-weight:500}
 .mc-d.tiene::after{content:'';position:absolute;bottom:1px;left:50%;transform:translateX(-50%);width:3px;height:3px;border-radius:50%;background:var(--verde)}
+.mc-d.finde{color:var(--bor)!important;cursor:not-allowed;background:var(--gc)!important}
 .stat-sm{background:var(--gc);border-radius:var(--r);padding:.65rem .85rem;margin-bottom:.5rem}
 .stat-sm-v{font-size:20px;font-weight:600;color:var(--azul);line-height:1}
 .stat-sm-l{font-size:11px;color:var(--gm);margin-top:2px}
@@ -87,7 +88,8 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
 /* AGENDA */
 .agenda-wrap{background:white;border-radius:var(--rl);border:1px solid var(--bor);box-shadow:var(--sh);overflow:hidden;margin-bottom:1rem}
 .ag-head{display:grid;border-bottom:1px solid var(--bor)}
-.ag-body{overflow-y:auto;max-height:400px}
+.ag-body{overflow-y:auto;overflow-x:auto;max-height:400px}
+.agenda-wrap{overflow-x:auto}
 .ag-row{display:grid;border-bottom:1px solid var(--bor);min-height:54px}
 .ag-row:last-child{border-bottom:none}
 .ag-time{padding:5px 6px 0;font-size:11px;color:var(--gm);text-align:right;border-right:1px solid var(--bor);width:58px;flex-shrink:0}
@@ -324,10 +326,16 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
           </div>
           <div class="mc-grid" id="mcGrid"></div>
         </div>
-        <div class="sbd-tit">Resumen</div>
-        <div class="stat-sm"><div class="stat-sm-v" id="stHoy">—</div><div class="stat-sm-l">Turnos hoy</div></div>
-        <div class="stat-sm"><div class="stat-sm-v" id="stMan">—</div><div class="stat-sm-l">Turnos mañana</div></div>
-        <div class="stat-sm"><div class="stat-sm-v" id="stSem">—</div><div class="stat-sm-l">Esta semana</div></div>
+        <!-- Segundo mes calendario -->
+        <div class="sbd-tit" style="margin-top:.75rem">Próximo mes</div>
+        <div class="mc-wrap">
+          <div class="mc-nav">
+            <button class="mc-btn" onclick="mcNav2(-1)">‹</button>
+            <span style="font-size:12px;font-weight:500" id="mcTit2"></span>
+            <button class="mc-btn" onclick="mcNav2(1)">›</button>
+          </div>
+          <div class="mc-grid" id="mcGrid2"></div>
+        </div>
         <div style="display:flex;align-items:center;justify-content:space-between;margin:.75rem 0 .5rem">
           <div class="sbd-tit" style="margin:0">Recordatorios</div>
           <span style="font-size:10.5px;color:var(--gm)" id="recCnt"></span>
@@ -745,7 +753,6 @@ function actualizarStats(){
   // resumen bar
   const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
   set('rbHoy',tot); set('rbConf',conf); set('rbAten',aten); set('rbCanc',canc); set('rbSobre',sobre); set('rbMan',manTot);
-  set('stHoy',tot); set('stMan',manTot); set('stSem',sem);
 }
 
 // ── SIDEBAR ───────────────────────────────────────────────────
@@ -795,6 +802,7 @@ function renderAgenda(){
   // HEAD
   const head=document.getElementById('agHead');
   head.style.gridTemplateColumns='58px repeat(6,1fr)';
+  head.style.minWidth='600px';
   head.innerHTML='<div style="width:58px;border-right:1px solid var(--bor)"></div>';
   for(let i=0;i<6;i++){
     const d=new Date(lunes); d.setDate(lunes.getDate()+i);
@@ -812,7 +820,7 @@ function renderAgenda(){
   if(!horas.length){ body.innerHTML='<div class="empty">Sin horarios disponibles para esta semana</div>'; return; }
   body.innerHTML='';
   horas.forEach(hora=>{
-    let row=`<div class="ag-row" style="grid-template-columns:58px repeat(6,1fr)"><div class="ag-time">${hora}</div>`;
+    let row=`<div class="ag-row" style="grid-template-columns:58px repeat(6,1fr);min-width:600px"><div class="ag-time">${hora}</div>`;
     for(let i=0;i<6;i++){
       const d=new Date(lunes); d.setDate(lunes.getDate()+i);
       const fs=fStr(d); const esH=fs===HOY;
@@ -898,7 +906,28 @@ function enviarTodosWA(){
 }
 
 // ── MINI CALENDARIO ───────────────────────────────────────────
+let mcOffset2 = 1; // segundo mes arranca en el mes siguiente
 function mcNav(d){ mcOffset+=d; renderMiniCal(); }
+function mcNav2(d){ mcOffset2+=d; renderMiniCal2(); }
+function renderMiniCal2(){
+  const hoy=new Date();
+  const mes=new Date(hoy.getFullYear(),hoy.getMonth()+mcOffset2,1);
+  const ultD=new Date(mes.getFullYear(),mes.getMonth()+1,0).getDate();
+  const primerDow=(mes.getDay()+6)%7;
+  const HOY=hoyStr();
+  const diasConT=new Set(turnos.map(t=>t.fecha));
+  const tit=document.getElementById('mcTit2'); if(tit) tit.textContent=`${MESES_M[mes.getMonth()]} ${mes.getFullYear()}`;
+  let html=['Lu','Ma','Mi','Ju','Vi','Sá','Do'].map(d=>`<div class="mc-dh">${d}</div>`).join('');
+  for(let i=0;i<primerDow;i++) html+='<div></div>';
+  for(let d=1;d<=ultD;d++){
+    const dow=new Date(mes.getFullYear(),mes.getMonth(),d).getDay();
+    const fs=`${mes.getFullYear()}-${S(mes.getMonth()+1)}-${S(d)}`;
+    const esH=fs===HOY; const tieneT=diasConT.has(fs);
+    const esFinde=dow===0||dow===6;
+    html+=`<div class="mc-d${esH?' hoy':''}${tieneT&&!esH?' tiene':''}${esFinde?' finde':''}" onclick="${!esFinde?`irAFecha('${fs}')`:''}">${d}</div>`;
+  }
+  const el=document.getElementById('mcGrid2'); if(el) el.innerHTML=html;
+}
 function renderMiniCal(){
   const hoy=new Date();
   const mes=new Date(hoy.getFullYear(),hoy.getMonth()+mcOffset,1);
@@ -910,11 +939,14 @@ function renderMiniCal(){
   let html=['Lu','Ma','Mi','Ju','Vi','Sá','Do'].map(d=>`<div class="mc-dh">${d}</div>`).join('');
   for(let i=0;i<primerDow;i++) html+='<div></div>';
   for(let d=1;d<=ultD;d++){
+    const fd=new Date(mes.getFullYear(),mes.getMonth(),d);
     const fs=`${mes.getFullYear()}-${S(mes.getMonth()+1)}-${S(d)}`;
     const esH=fs===HOY; const tieneT=diasConT.has(fs);
-    html+=`<div class="mc-d${esH?' hoy':''}${tieneT&&!esH?' tiene':''}" onclick="irAFecha('${fs}')">${d}</div>`;
+    const esFinde=fd.getDay()===0||fd.getDay()===6;
+    html+=`<div class="mc-d${esH?' hoy':''}${tieneT&&!esH?' tiene':''}${esFinde?' finde':''}" onclick="${!esFinde?`irAFecha('${fs}')`:''}">${d}</div>`;
   }
   document.getElementById('mcGrid').innerHTML=html;
+  renderMiniCal2();
 }
 function irAFecha(f){
   const d=new Date(f+'T00:00:00');
@@ -1118,10 +1150,27 @@ function verDetalle(id){
   document.getElementById('detFooter').innerHTML=`
     <button class="btn-s" onclick="cerrarModal('mDet')">Cerrar</button>
     <button class="btn-s" onclick="editarTurno('${t.id}')">✏️ Editar</button>
+    <button class="btn-s" style="color:var(--rojo);border-color:rgba(226,75,74,.3)" onclick="cancelarTurno('${t.id}')">✕ Cancelar turno</button>
     <button class="btn-p" onclick="guardarDetalle('${t.id}')">💾 Guardar</button>
     ${t.pacTel?`<a href="https://wa.me/549${t.pacTel}" target="_blank" class="btn-wa">WA</a>`:''}
   `;
   abrirModal('mDet');
+}
+
+async function cancelarTurno(id){
+  const motivo = prompt('Motivo de cancelación (opcional):');
+  if(motivo === null) return; // canceló el prompt
+  try {
+    await db.collection('turnos').doc(id).update({
+      estado: 'cancelado',
+      motivoCancelacion: motivo,
+      canceladoEn: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    toast('Turno cancelado','ok');
+    cerrarModal('mDet');
+  } catch(e){
+    toast('Error: '+e.message,'err');
+  }
 }
 
 async function guardarDetalle(id){
