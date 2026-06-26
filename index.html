@@ -160,6 +160,10 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
 .slot-btn:hover:not(:disabled){border-color:var(--azul);color:var(--azul)}
 .slot-btn.sel{background:var(--azul);color:white;border-color:var(--azul);font-weight:500}
 .slot-btn:disabled{background:var(--gc);color:var(--bor);text-decoration:line-through;cursor:not-allowed;border-color:transparent}
+.slot-btn.sobre-slot{border-color:#E24B4A!important;color:#E24B4A!important;background:#FFF5F5!important;cursor:pointer!important}
+.slot-btn.sobre-slot:hover{background:#FFE4E4!important}
+.slot-btn.sobre-slot{background:#FFF0F0;border-color:#E24B4A;color:#E24B4A;cursor:pointer}
+.slot-btn.sobre-slot:hover{background:#FFE4E4}
 .slot-none{font-size:12.5px;color:var(--gm);text-align:center;padding:.75rem;grid-column:span 4}
 
 /* BUSCADOR PACIENTE */
@@ -429,7 +433,7 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
       </div>
       <div class="fg"><label class="flbl">Nota / Observaciones</label><textarea class="finput" id="nNota" style="min-height:50px;resize:vertical" placeholder="Observaciones..."></textarea></div>
       <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:8px;background:var(--rojop);border-radius:var(--r);border:1px solid rgba(226,75,74,.2)">
-        <input type="checkbox" id="nSobre">
+        <input type="checkbox" id="nSobre" onchange="actualizarSlots()">
         <span><strong>Sobreturno</strong> — se agrega aunque el horario esté ocupado (se muestra en rojo)</span>
       </label>
     </div>
@@ -987,15 +991,22 @@ function abrirNuevoTurno(fecha='', hora='', profId=null){
 }
 
 function actualizarSlots(){
-  const profId=document.getElementById('nProf').value;
-  const fecha=document.getElementById('nFecha').value;
-  const grid=document.getElementById('nSlots');
+  const profId  = document.getElementById('nProf').value;
+  const fecha   = document.getElementById('nFecha').value;
+  const esSobre = document.getElementById('nSobre').checked;
+  const grid    = document.getElementById('nSlots');
   document.getElementById('nHora').value='';
   document.querySelectorAll('.slot-btn').forEach(b=>b.classList.remove('sel'));
   if(!profId||!fecha){grid.innerHTML='<div class="slot-none">Seleccioná profesional y fecha</div>';return;}
   const slots=generarSlots(profId,fecha);
   if(!slots.length){grid.innerHTML='<div class="slot-none">Sin horarios disponibles ese día</div>';return;}
-  grid.innerHTML=slots.map(s=>`<button class="slot-btn${!s.libre?' ':''}" data-hora="${s.hora}" onclick="selSlot(this,'${s.hora}')" ${!s.libre?'disabled':''}>${s.hora}</button>`).join('');
+  grid.innerHTML=slots.map(s=>{
+    // Si es sobreturno, mostrar ocupados pero con estilo diferente (no deshabilitados)
+    if(esSobre){
+      return `<button class="slot-btn${!s.libre?' sobre-slot':''}" data-hora="${s.hora}" onclick="selSlot(this,'${s.hora}')" title="${!s.libre?'Ocupado — se agregará como sobreturno':''}">${s.hora}${!s.libre?' <span style="font-size:9px">ST</span>':''}</button>`;
+    }
+    return `<button class="slot-btn${!s.libre?' disabled':''}" data-hora="${s.hora}" onclick="${s.libre?`selSlot(this,'${s.hora}')`:'void(0)'}" ${!s.libre?'disabled':''}>${s.hora}</button>`;
+  }).join('');
 }
 
 function selSlot(btn,h){
@@ -1153,7 +1164,11 @@ function verDetalle(id){
     <button class="btn-s" onclick="editarTurno('${t.id}')">✏️ Editar</button>
     <button class="btn-s" style="color:var(--rojo);border-color:rgba(226,75,74,.3)" onclick="cancelarTurno('${t.id}')">✕ Cancelar turno</button>
     <button class="btn-p" onclick="guardarDetalle('${t.id}')">💾 Guardar</button>
-    ${t.pacTel?`<a href="https://wa.me/549${t.pacTel}" target="_blank" class="btn-wa">WA</a>`:''}
+    ${t.pacTel?(()=>{
+      const p2=gProf(t.profesionalId);
+      const msg=encodeURIComponent('Hola '+t.pacNombre.split(' ')[0]+' 👋 Te recordamos tu turno en *Instituto Espejo* el *'+labelF(t.fecha)+'* a las *'+t.hora+' hs* con *'+(p2?p2.nom+' '+p2.ape:'el profesional')+'*.\n📍 San Rafael, Mendoza · ☎ '+TEL+'\n¡Te esperamos! 😊');
+      return `<a href="https://wa.me/549${t.pacTel}?text=${msg}" target="_blank" class="btn-wa">WA</a>`;
+    })():''}
   `;
   abrirModal('mDet');
 }
