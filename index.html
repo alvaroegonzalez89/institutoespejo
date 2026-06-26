@@ -701,20 +701,30 @@ function doLogout(){ if(unsubTurnos)unsubTurnos(); if(unsubPacs)unsubPacs(); aut
 
 // ── LISTENERS FIRESTORE ───────────────────────────────────────
 function iniciarListeners(){
-  unsubTurnos = db.collection('turnos').orderBy('fecha').orderBy('hora')
+  // Sin orderBy para evitar requerir índices compuestos en Firestore
+  unsubTurnos = db.collection('turnos')
     .onSnapshot(snap=>{
-      turnos=snap.docs.map(d=>({...d.data(),id:d.id}));
+      turnos = snap.docs.map(d=>({...d.data(), id:d.id}));
+      // ordenar en cliente
+      turnos.sort((a,b)=> a.fecha===b.fecha ? a.hora.localeCompare(b.hora) : a.fecha.localeCompare(b.fecha));
       renderAgenda();
       renderTurnosHoy();
       renderRecordatorios();
       actualizarStats();
       renderMiniCal();
       if(profSelDoc) renderVistaMedico();
+    }, err=>{
+      console.error('onSnapshot turnos error:', err);
+      toast('Error de conexión: '+err.message, 'err');
     });
-  unsubPacs = db.collection('pacientes').orderBy('ape')
+
+  unsubPacs = db.collection('pacientes')
     .onSnapshot(snap=>{
-      pacientes=snap.docs.map(d=>({...d.data(),id:d.id}));
+      pacientes = snap.docs.map(d=>({...d.data(), id:d.id}));
+      pacientes.sort((a,b)=>(a.ape||'').localeCompare(b.ape||''));
       renderPacientes();
+    }, err=>{
+      console.error('onSnapshot pacientes error:', err);
     });
 }
 
@@ -986,65 +996,78 @@ function selPacEnModal(id){
 }
 
 async function guardarTurno(){
-  const profId = document.getElementById('nProf').value;
-  const fecha  = document.getElementById('nFecha').value;
-  const hora   = document.getElementById('nHora').value;
-  const esSob  = document.getElementById('nSobre').checked;
-  const nom    = document.getElementById('nNom').value.trim();
-  const ape    = document.getElementById('nApe').value.trim();
-  const dni    = document.getElementById('nDni').value.trim();
-  const tel    = document.getElementById('nTel').value.trim();
-  const serv   = document.getElementById('nServ').value.trim();
-  const nota   = document.getElementById('nNota').value.trim();
-
-  if(!profId||!fecha||!hora){toast('Seleccioná profesional, fecha y horario','err');return;}
-  if(!nom&&!ape){toast('Ingresá el nombre del paciente','err');return;}
-
-  // Verificar duplicado (salvo sobreturno)
-  if(!esSob){
-    const col=turnos.find(t=>t.profesionalId===profId&&t.fecha===fecha&&t.hora===hora&&t.estado!=='cancelado');
-    if(col){toast('Ese horario ya está ocupado. Marcá sobreturno si querés agregarlo igual.','err');return;}
-  }
-
-  // Buscar o crear paciente
-  let pacId=pacSelModal;
-  if(!pacId){
-    const exist=pacientes.find(p=>p.dni&&p.dni===dni&&dni!=='');
-    if(exist){
-      pacId=exist.id;
-    } else {
-      const ref=await db.collection('pacientes').add({
-        nom, ape, dni:dni||'', telefono:tel||'',
-        creadoEn: firebase.firestore.FieldValue.serverTimestamp()
-      });
-      pacId=ref.id;
-    }
-  }
-
-  const data={
-    profesionalId: profId,
-    pacienteId: pacId,
-    pacNombre: `${nom} ${ape}`.trim(),
-    pacTel: tel,
-    fecha, hora,
-    servicio: serv||'Consulta',
-    estado: 'confirmado',
-    esSobreturno: esSob,
-    nota,
-    creadoEn: firebase.firestore.FieldValue.serverTimestamp()
-  };
-
   try {
+    const profId = document.getElementById('nProf').value;
+    const fecha  = document.getElementById('nFecha').value;
+    const hora   = document.getElementById('nHora').value;
+    const esSob  = document.getElementById('nSobre').checked;
+    const nom    = document.getElementById('nNom').value.trim();
+    const ape    = document.getElementById('nApe').value.trim();
+    const dni    = document.getElementById('nDni').value.trim();
+    const tel    = document.getElementById('nTel').value.trim();
+    const serv   = document.getElementById('nServ').value.trim();
+    const nota   = document.getElementById('nNota').value.trim();
+
+    if(!profId){toast('Seleccioná un profesional','err');return;}
+    if(!fecha){toast('Seleccioná una fecha','err');return;}
+    if(!hora){toast('Seleccioná un horario','err');return;}
+    if(!nom&&!ape){toast('Ingresá el nombre del paciente','err');return;}
+
+    // Verificar duplicado (salvo sobreturno)
+    if(!esSob){
+      const col=turnos.find(t=>t.profesionalId===profId&&t.fecha===fecha&&t.hora===hora&&t.estado!=='cancelado');
+      if(col){toast('Ese horario ya está ocupado. Marcá sobreturno si querés agregarlo igual.','err');return;}
+    }
+
+    // Buscar o crear paciente
+    let pacId = pacSelModal || null;
+    if(!pacId){
+      if(dni){
+        const exist = pacientes.find(p=>p.dni&&p.dni===dni);
+        if(exist) pacId = exist.id;
+      }
+      if(!pacId){
+        const ref = await db.collection('pacientes').add({
+          nom: nom,
+          ape: ape,
+          dni: dni,
+          telefono: tel,
+          creadoEn: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        pacId = ref.id;
+      }
+    }
+
+    // Guardar turno
+    const turnoData = {
+      profesionalId: profId,
+      pacienteId: pacId,
+      pacNombre: (nom + ' ' + ape).trim(),
+      pacTel: tel,
+      fecha: fecha,
+      hora: hora,
+      servicio: serv || 'Consulta',
+      estado: 'confirmado',
+      esSobreturno: esSob,
+      nota: nota,
+      creadoEn: firebase.firestore.FieldValue.serverTimestamp()
+    };
+
     if(turnoEditId){
-      await db.collection('turnos').doc(turnoEditId).update(data);
+      await db.collection('turnos').doc(turnoEditId).update(turnoData);
       toast('Turno actualizado ✓','ok');
     } else {
-      await db.collection('turnos').add(data);
+      await db.collection('turnos').add(turnoData);
       toast('Turno guardado ✓','ok');
     }
+
+    turnoEditId = null;
+    pacSelModal = null;
     cerrarModal('mNuevo');
+
   } catch(e){
-    toast('Error al guardar: '+e.message,'err');
+    console.error('Error guardarTurno:', e);
+    toast('Error: ' + e.message, 'err');
   }
 }
 
