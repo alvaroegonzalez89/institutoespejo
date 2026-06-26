@@ -834,7 +834,7 @@ function renderAgenda(){
           style="background:${t.esSobreturno?'#FFE4E4':p?.light||'#eee'};border-left-color:${t.esSobreturno?'#E24B4A':p?.color||'#888'}"
           onclick="verDetalle('${t.id}')">
           <div class="tn">${t.pacNombre?t.pacNombre.split(' ')[0]:'—'}${t.esSobreturno?' <small style="background:#E24B4A;color:white;border-radius:2px;padding:0 3px">ST</small>':''}</div>
-          <div class="ti">${p?p.ape:''}</div>
+          <div class="ti">${p?(p.ape+(p.nom?' '+p.nom.split(' ')[0]:'')):'—'}</div>
         </div>`;
       }).join('');
       tbody+=`<td class="${esH?'hoy':''}" onclick="celdaClick('${fs}','${hora}')">${bloques}</td>`;
