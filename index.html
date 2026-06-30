@@ -52,7 +52,17 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
 .rb-lbl{font-size:10.5px;color:var(--gm)}
 
 /* LAYOUT SECRETARIA */
-.sec-layout{display:grid;grid-template-columns:195px 1fr 215px;flex:1;min-height:calc(100vh - 54px - 44px)}
+.sec-layout{display:grid;grid-template-columns:195px 1fr 215px;flex:1;min-height:calc(100vh - 54px - 44px);transition:grid-template-columns .25s ease}
+.sec-layout.no-izq{grid-template-columns:0px 1fr 215px}
+.sec-layout.no-der{grid-template-columns:195px 1fr 0px}
+.sec-layout.no-izq.no-der{grid-template-columns:0px 1fr 0px}
+.sb-izq,.sb-der{transition:opacity .2s,padding .2s}
+.sec-layout.no-izq .sb-izq{opacity:0;padding:0;overflow:hidden;pointer-events:none}
+.sec-layout.no-der .sb-der{opacity:0;padding:0;overflow:hidden;pointer-events:none}
+.toggle-sb{position:sticky;top:60px;background:white;border:1px solid var(--bor);border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:12px;color:var(--gm);z-index:10;box-shadow:var(--sh);flex-shrink:0}
+.toggle-sb:hover{background:var(--gc);color:var(--go)}
+.toggle-izq-wrap{display:flex;align-items:flex-start}
+.toggle-der-wrap{display:flex;align-items:flex-start;justify-content:flex-end}
 
 /* SIDEBAR IZQ */
 .sb-izq{background:white;border-right:1px solid var(--bor);padding:.75rem 0;overflow-y:auto}
@@ -76,8 +86,11 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
 .mc-d{font-size:11px;text-align:center;padding:5px 2px;border-radius:5px;cursor:pointer;border:1.5px solid transparent;position:relative}
 .mc-d:hover{background:var(--azulp);color:var(--azul)}
 .mc-d.hoy{background:var(--azul);color:white;font-weight:500}
-.mc-d.tiene::after{content:'';position:absolute;bottom:1px;left:50%;transform:translateX(-50%);width:3px;height:3px;border-radius:50%;background:var(--verde)}
 .mc-d.finde{color:var(--bor)!important;cursor:not-allowed;background:var(--gc)!important}
+.mc-d.tiene-dado{background:var(--verdep);color:#0F6E56;font-weight:500}
+.mc-d.tiene-espera{background:var(--ambarp);color:#854F0B;font-weight:500}
+.mc-d.aus-prof{background:var(--rojop)!important;color:var(--rojo)!important;cursor:not-allowed;text-decoration:line-through}
+.mc-d.no-atiende{color:var(--bor)!important;cursor:not-allowed;background:var(--gc)!important;opacity:.6}
 .stat-sm{background:var(--gc);border-radius:var(--r);padding:.65rem .85rem;margin-bottom:.5rem}
 .stat-sm-v{font-size:20px;font-weight:600;color:var(--azul);line-height:1}
 .stat-sm-l{font-size:11px;color:var(--gm);margin-top:2px}
@@ -103,11 +116,20 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
 .ag-table tr:last-child td{border-bottom:none}
 .ag-table td.hoy{background:rgba(235,243,251,.3)}
 .ag-table td:not(:first-child):hover{background:rgba(26,78,122,.03)}
-.tblk{border-radius:5px;padding:3px 6px;font-size:11px;line-height:1.3;cursor:pointer;margin-bottom:2px;border-left:3px solid;transition:.1s}
-.tblk:hover{filter:brightness(.93)}
+.ag-table td.no-trabaja{background:repeating-linear-gradient(45deg,#f5f4f0,#f5f4f0 6px,#ebe9e3 6px,#ebe9e3 12px);cursor:not-allowed}
+.ag-table td.no-trabaja:hover{background:repeating-linear-gradient(45deg,#f5f4f0,#f5f4f0 6px,#ebe9e3 6px,#ebe9e3 12px)}
+.tblk{border-radius:5px;padding:3px 6px;font-size:11px;line-height:1.3;cursor:pointer;margin-bottom:2px;border-left:3px solid;transition:.1s;position:relative}
+.tblk:hover{filter:brightness(.95);box-shadow:0 1px 4px rgba(0,0,0,.15)}
 .tblk.sobre{border-left-color:#E24B4A!important;background:#FFE4E4!important}
-.tn{font-weight:500;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tblk.est-espera{background:var(--ambarp);border-left-color:var(--ambar)}
+.tblk.est-dado{background:var(--verdep);border-left-color:var(--verde)}
+.tblk.est-presente{background:#d1fae5;border-left-color:#065f46}
+.tblk.est-asa{background:var(--rojop);border-left-color:var(--rojo)}
+.tblk.est-aca{background:#FFEAD1;border-left-color:#BA7517}
+.tn{font-weight:500;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:3px}
 .ti{font-size:10px;opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tblk-icos{display:flex;gap:2px;align-items:center;flex-shrink:0}
+.tblk-ico{font-size:10px;cursor:help}
 
 /* TOOLBAR */
 .toolbar{display:flex;align-items:center;gap:8px;margin-bottom:.85rem;flex-wrap:wrap}
@@ -127,8 +149,11 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
 
 /* PILLS */
 .pill{font-size:10px;padding:2px 8px;border-radius:20px;font-weight:500;white-space:nowrap}
-.pill.confirmado{background:var(--verdep);color:#0F6E56}
-.pill.atendido{background:#d1fae5;color:#065f46}
+.pill.confirmado,.pill.dado{background:var(--verdep);color:#0F6E56}
+.pill.espera{background:var(--ambarp);color:#854F0B}
+.pill.presente{background:#d1fae5;color:#065f46}
+.pill.asa{background:var(--rojop);color:#791F1F}
+.pill.aca{background:#FFEAD1;color:#9A5B0C}
 .pill.cancelado{background:var(--rojop);color:#791F1F}
 .pill.sobre{background:#FFE4E4;color:#A32D2D;border:1px solid #E24B4A}
 
@@ -274,19 +299,24 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
   <!-- RESUMEN BAR -->
   <div class="res-bar" id="resBar">
     <div class="rb-item" style="background:var(--azulp);border-color:rgba(26,78,122,.15)"><span class="rb-val" id="rbHoy" style="color:var(--azul)">0</span><span class="rb-lbl">Turnos hoy</span></div>
-    <div class="rb-item" style="background:var(--verdep);border-color:rgba(29,158,117,.2)"><span class="rb-val" id="rbConf" style="color:var(--verde)">0</span><span class="rb-lbl">Confirmados</span></div>
-    <div class="rb-item" style="background:#d1fae5;border-color:rgba(6,95,70,.15)"><span class="rb-val" id="rbAten" style="color:#065f46">0</span><span class="rb-lbl">Atendidos</span></div>
-    <div class="rb-item" style="background:var(--rojop);border-color:rgba(226,75,74,.2)"><span class="rb-val" id="rbCanc" style="color:var(--rojo)">0</span><span class="rb-lbl">Cancelados</span></div>
+    <div class="rb-item" style="background:var(--ambarp);border-color:rgba(186,117,23,.2)"><span class="rb-val" id="rbEspera" style="color:var(--ambar)">0</span><span class="rb-lbl">En espera</span></div>
+    <div class="rb-item" style="background:var(--verdep);border-color:rgba(29,158,117,.2)"><span class="rb-val" id="rbDado" style="color:var(--verde)">0</span><span class="rb-lbl">Dados</span></div>
+    <div class="rb-item" style="background:#d1fae5;border-color:rgba(6,95,70,.15)"><span class="rb-val" id="rbPres" style="color:#065f46">0</span><span class="rb-lbl">Presentes</span></div>
+    <div class="rb-item" style="background:var(--rojop);border-color:rgba(226,75,74,.2)"><span class="rb-val" id="rbAsa" style="color:var(--rojo)">0</span><span class="rb-lbl">Aus. s/aviso</span></div>
+    <div class="rb-item" style="background:#FFEAD1;border-color:rgba(186,117,23,.3)"><span class="rb-val" id="rbAca" style="color:#9A5B0C">0</span><span class="rb-lbl">Aus. c/aviso</span></div>
     <div class="rb-item" style="background:#FFE4E4;border-color:rgba(226,75,74,.3)"><span class="rb-val" id="rbSobre" style="color:var(--rojo)">0</span><span class="rb-lbl">Sobreturnos</span></div>
     <div class="rb-item" style="background:#dcf8c6;border-color:rgba(37,211,102,.3);margin-left:auto"><span class="rb-val" id="rbMan" style="color:#0F6E56">0</span><span class="rb-lbl">Mañana</span></div>
   </div>
 
   <!-- ══ SECRETARÍA ══ -->
   <div id="vSec" class="vista">
-    <div class="sec-layout">
-      <aside class="sb-izq">
-        <div style="padding:0 .6rem .5rem"><div class="sb-lbl">Profesionales</div><div id="profList"></div></div>
-      </aside>
+    <div class="sec-layout" id="secLayout">
+      <div class="toggle-izq-wrap">
+        <aside class="sb-izq" id="sbIzq" style="flex:1">
+          <div style="padding:0 .6rem .5rem"><div class="sb-lbl">Profesionales</div><div id="profList"></div></div>
+        </aside>
+        <button class="toggle-sb" onclick="toggleSidebar('izq')" id="btnToggleIzq" title="Ocultar/mostrar profesionales">‹</button>
+      </div>
       <main class="main">
         <div class="toolbar">
           <div class="wk-nav">
@@ -296,6 +326,9 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
           </div>
           <button class="btn-s" onclick="irHoy()">Hoy</button>
           <div class="ml-auto"></div>
+          <button class="btn-s" onclick="imprimirListadoDia()" title="Imprimir listado de pacientes del día">
+            🖨️ Imprimir
+          </button>
           <button class="btn-p" onclick="abrirNuevoTurno()">
             <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="white" stroke-width="2.2"><path d="M7 2v10M2 7h10"/></svg>
             Nuevo turno
@@ -319,7 +352,9 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
           </div>
         </div>
       </main>
-      <aside class="sb-der">
+      <div class="toggle-der-wrap">
+        <button class="toggle-sb" onclick="toggleSidebar('der')" id="btnToggleDer" title="Ocultar/mostrar calendario">›</button>
+        <aside class="sb-der" id="sbDer" style="flex:1">
         <div class="sbd-tit">Calendario</div>
         <div class="mc-wrap">
           <div class="mc-nav">
@@ -344,7 +379,8 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
           <span style="font-size:10.5px;color:var(--gm)" id="recCnt"></span>
         </div>
         <div id="recSbEl"></div>
-      </aside>
+        </aside>
+      </div>
     </div>
   </div>
 
@@ -432,6 +468,16 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
         <input type="hidden" id="nHora">
       </div>
       <div class="fg"><label class="flbl">Nota / Observaciones</label><textarea class="finput" id="nNota" style="min-height:50px;resize:vertical" placeholder="Observaciones..."></textarea></div>
+      <div class="fg">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-bottom:6px">
+          <input type="checkbox" id="nTieneLab" onchange="toggleLabSelect()">
+          <span>🧪 <strong>Tiene laboratorio</strong></span>
+        </label>
+        <div id="labSelectWrap" class="hidden">
+          <select class="fselect" id="nLab"></select>
+          <button type="button" class="btn-s" style="font-size:11px;margin-top:5px;padding:4px 10px" onclick="agregarLabNuevo()">+ Agregar otro laboratorio</button>
+        </div>
+      </div>
       <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:8px;background:var(--rojop);border-radius:var(--r);border:1px solid rgba(226,75,74,.2)">
         <input type="checkbox" id="nSobre" onchange="actualizarSlots()">
         <span><strong>Sobreturno</strong> — se agrega aunque el horario esté ocupado (se muestra en rojo)</span>
@@ -603,6 +649,7 @@ const DIAS_L = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sáb
 const MESES  = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const MESES_M= ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const TEL    = '2604396462';
+let LABORATORIOS = ['Naspi','Yebra','Paula','Natalia','Mauricio'];
 
 // Estado
 let profs     = JSON.parse(JSON.stringify(PROFS_INIT));
@@ -744,18 +791,18 @@ function actualizarStats(){
   const HOY=hoyStr();
   const man=new Date(); man.setDate(man.getDate()+1);
   const mStr=fStr(man);
-  const hTs=turnos.filter(t=>t.fecha===HOY);
-  const conf=hTs.filter(t=>t.estado==='confirmado').length;
-  const aten=hTs.filter(t=>t.estado==='atendido').length;
-  const canc=hTs.filter(t=>t.estado==='cancelado').length;
-  const sobre=hTs.filter(t=>t.esSobreturno&&t.estado!=='cancelado').length;
-  const tot=hTs.filter(t=>t.estado!=='cancelado').length;
+  const hTs=turnos.filter(t=>t.fecha===HOY&&t.estado!=='cancelado');
+  const espera=hTs.filter(t=>t.estado==='espera').length;
+  const dado=hTs.filter(t=>!t.estado||t.estado==='dado').length;
+  const pres=hTs.filter(t=>t.estado==='presente').length;
+  const asa=hTs.filter(t=>t.estado==='asa').length;
+  const aca=hTs.filter(t=>t.estado==='aca').length;
+  const sobre=hTs.filter(t=>t.esSobreturno).length;
+  const tot=hTs.length;
   const manTot=turnos.filter(t=>t.fecha===mStr&&t.estado!=='cancelado').length;
-  const lunes=getLunes(0); let sem=0;
-  for(let i=0;i<6;i++){const d=new Date(lunes);d.setDate(lunes.getDate()+i);sem+=turnos.filter(t=>t.fecha===fStr(d)&&t.estado!=='cancelado').length;}
   // resumen bar
   const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
-  set('rbHoy',tot); set('rbConf',conf); set('rbAten',aten); set('rbCanc',canc); set('rbSobre',sobre); set('rbMan',manTot);
+  set('rbHoy',tot); set('rbEspera',espera); set('rbDado',dado); set('rbPres',pres); set('rbAsa',asa); set('rbAca',aca); set('rbSobre',sobre); set('rbMan',manTot);
 }
 
 // ── SIDEBAR ───────────────────────────────────────────────────
@@ -777,7 +824,7 @@ function renderSidebar(){
   el.innerHTML=html;
 }
 
-function filtrarProf(id){ profFiltro=id; renderSidebar(); renderAgenda(); renderTurnosHoy(); renderRecordatorios(); }
+function filtrarProf(id){ profFiltro=id; renderSidebar(); renderAgenda(); renderTurnosHoy(); renderRecordatorios(); renderMiniCal(); }
 
 // ── AGENDA ────────────────────────────────────────────────────
 function cambiarSem(d){ offSemana+=d; renderAgenda(); }
@@ -828,16 +875,40 @@ function renderAgenda(){
       const d=new Date(lunes); d.setDate(lunes.getDate()+i);
       const fs=fStr(d); const esH=fs===HOY;
       const ts=turnos.filter(t=>t.fecha===fs&&t.hora===hora&&t.estado!=='cancelado'&&(profFiltro==='todos'||t.profesionalId===profFiltro));
+
+      // Determinar si la celda es "no trabaja" (tachada) - solo aplica si hay 1 prof filtrado
+      let noTrabaja = false;
+      if(profFiltro!=='todos'){
+        const p = gProf(profFiltro);
+        if(p && !tieneAus(profFiltro,fs)){
+          const dow = d.getDay();
+          const enFranja = p.hs.some(h => h.d===dow && hora>=h.de && hora<h.a);
+          noTrabaja = !enFranja;
+        } else if(p && tieneAus(profFiltro,fs)){
+          noTrabaja = true;
+        }
+      }
+
       const bloques=ts.map(t=>{
         const p=gProf(t.profesionalId);
-        return `<div class="tblk${t.esSobreturno?' sobre':''}" 
-          style="background:${t.esSobreturno?'#FFE4E4':p?.light||'#eee'};border-left-color:${t.esSobreturno?'#E24B4A':p?.color||'#888'}"
-          onclick="verDetalle('${t.id}')">
-          <div class="tn">${t.pacNombre?t.pacNombre.split(' ')[0]:'—'}${t.esSobreturno?' <small style="background:#E24B4A;color:white;border-radius:2px;padding:0 3px">ST</small>':''}</div>
+        const estado = t.estado || 'espera';
+        const estClass = t.esSobreturno ? 'sobre' : 'est-'+estado;
+        const estLabel = {espera:'',dado:'',presente:'P',asa:'ASA',aca:'ACA'}[estado] || '';
+        const labIco = t.labNombre ? `<span class="tblk-ico" title="Laboratorio: ${t.labNombre}">🧪</span>` : '';
+        const notaIco = t.nota ? `<span class="tblk-ico" title="${t.nota.replace(/"/g,'&quot;')}">📝</span>` : '';
+        return `<div class="tblk ${estClass}" onclick="verDetalle('${t.id}')">
+          <div class="tn">${t.pacNombre?t.pacNombre.split(' ')[0]:'—'}
+            ${t.esSobreturno?' <small style="background:#E24B4A;color:white;border-radius:2px;padding:0 3px">ST</small>':''}
+            ${estLabel?` <small style="background:rgba(0,0,0,.12);border-radius:2px;padding:0 3px;font-size:9px">${estLabel}</small>`:''}
+            <span class="tblk-icos">${labIco}${notaIco}</span>
+          </div>
           <div class="ti">${p?(p.ape+(p.nom?' '+p.nom.split(' ')[0]:'')):'—'}</div>
         </div>`;
       }).join('');
-      tbody+=`<td class="${esH?'hoy':''}" onclick="celdaClick('${fs}','${hora}')">${bloques}</td>`;
+
+      const cellClass = [esH?'hoy':'', noTrabaja?'no-trabaja':''].filter(Boolean).join(' ');
+      const cellClick = noTrabaja ? '' : `onclick="celdaClick('${fs}','${hora}')"`;
+      tbody+=`<td class="${cellClass}" ${cellClick}>${bloques}</td>`;
     }
     tbody += '</tr>';
   });
@@ -857,17 +928,19 @@ function renderTurnosHoy(){
   const el=document.getElementById('turnosHoyEl');
   document.getElementById('cntHoy').textContent=`${ts.length} turno${ts.length!==1?'s':''}`;
   if(!ts.length){el.innerHTML='<div class="empty">Sin turnos para hoy</div>';return;}
+  const estLabels={espera:'En espera',dado:'Dado',presente:'Presente',asa:'Ausente s/aviso',aca:'Ausente c/aviso'};
   el.innerHTML=ts.map(t=>{
     const p=gProf(t.profesionalId);
+    const est = t.estado || 'dado';
     return `<div class="t-row${t.esSobreturno?' sobre':''}" onclick="verDetalle('${t.id}')">
       <span class="t-hora">${t.hora}</span>
       <div class="pdot" style="background:${p?.color||'#888'}"></div>
       <div class="t-inf">
-        <div class="t-nom">${t.pacNombre||'—'}</div>
+        <div class="t-nom">${t.pacNombre||'—'} ${t.labNombre?'<span title="Laboratorio: '+t.labNombre+'" style="font-size:11px">🧪</span>':''} ${t.nota?'<span title="'+t.nota.replace(/"/g,'&quot;')+'" style="font-size:11px">📝</span>':''}</div>
         <div class="t-det">${t.servicio||'—'} · ${p?p.ape+' '+p.nom:''}</div>
       </div>
       ${t.esSobreturno?'<span class="pill sobre">ST</span>':''}
-      <span class="pill confirmado">Confirmado</span>
+      <span class="pill ${est}">${estLabels[est]||est}</span>
     </div>`;
   }).join('');
 }
@@ -939,16 +1012,44 @@ function renderMiniCal(){
   const ultD=new Date(mes.getFullYear(),mes.getMonth()+1,0).getDate();
   const primerDow=(mes.getDay()+6)%7;
   const HOY=hoyStr();
-  const diasConT=new Set(turnos.map(t=>t.fecha));
   document.getElementById('mcTit').textContent=`${MESES_M[mes.getMonth()]} ${mes.getFullYear()}`;
   let html=['Lu','Ma','Mi','Ju','Vi','Sá','Do'].map(d=>`<div class="mc-dh">${d}</div>`).join('');
   for(let i=0;i<primerDow;i++) html+='<div></div>';
+
+  const profEsp = profFiltro!=='todos' ? gProf(profFiltro) : null;
+
   for(let d=1;d<=ultD;d++){
     const fd=new Date(mes.getFullYear(),mes.getMonth(),d);
     const fs=`${mes.getFullYear()}-${S(mes.getMonth()+1)}-${S(d)}`;
-    const esH=fs===HOY; const tieneT=diasConT.has(fs);
+    const esH=fs===HOY;
     const esFinde=fd.getDay()===0||fd.getDay()===6;
-    html+=`<div class="mc-d${esH?' hoy':''}${tieneT&&!esH?' tiene':''}${esFinde?' finde':''}" onclick="${!esFinde?`irAFecha('${fs}')`:''}">${d}</div>`;
+
+    let claseExtra='';
+    let clickeable = !esFinde;
+
+    if(profEsp){
+      // Vista filtrada por profesional: marcar días que atiende / ausencia
+      const trabaja = profEsp.hs.some(h=>h.d===fd.getDay());
+      const ausente = tieneAus(profFiltro, fs);
+      if(ausente){ claseExtra=' aus-prof'; clickeable=false; }
+      else if(!trabaja){ claseExtra=' no-atiende'; clickeable=false; }
+      else {
+        const tsDia = turnos.filter(t=>t.profesionalId===profFiltro&&t.fecha===fs&&t.estado!=='cancelado');
+        if(tsDia.length){
+          const hayEspera = tsDia.some(t=>t.estado==='espera');
+          claseExtra = hayEspera ? ' tiene-espera' : ' tiene-dado';
+        }
+      }
+    } else {
+      // Vista "todos": verde si hay turnos dados ese día
+      const tsDia = turnos.filter(t=>t.fecha===fs&&t.estado!=='cancelado');
+      if(tsDia.length){
+        const hayEspera = tsDia.some(t=>t.estado==='espera');
+        claseExtra = hayEspera ? ' tiene-espera' : ' tiene-dado';
+      }
+    }
+
+    html+=`<div class="mc-d${esH?' hoy':''}${esFinde?' finde':''}${claseExtra}" onclick="${clickeable?`irAFecha('${fs}')`:''}" title="${profEsp&&tieneAus(profFiltro,fs)?'Profesional ausente':''}">${d}</div>`;
   }
   document.getElementById('mcGrid').innerHTML=html;
   renderMiniCal2();
@@ -969,6 +1070,8 @@ function abrirNuevoTurno(fecha='', hora='', profId=null){
   ['nNom','nApe','nDni','nTel','nServ','nNota','nBus'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
   document.getElementById('nHora').value='';
   document.getElementById('nSobre').checked=false;
+  document.getElementById('nTieneLab').checked=false;
+  document.getElementById('labSelectWrap').classList.add('hidden');
   document.getElementById('nBusRes').style.display='none';
   // Poblar profesionales
   const sel=document.getElementById('nProf');
@@ -1082,6 +1185,10 @@ async function guardarTurno(){
       }
     }
 
+    // Laboratorio
+    const tieneLab = document.getElementById('nTieneLab').checked;
+    const labNombre = tieneLab ? document.getElementById('nLab').value : '';
+
     // Guardar turno
     const turnoData = {
       profesionalId: profId,
@@ -1091,11 +1198,13 @@ async function guardarTurno(){
       fecha: fecha,
       hora: hora,
       servicio: serv || 'Consulta',
-      estado: 'confirmado',
+      estado: turnoEditId ? undefined : 'dado',
       esSobreturno: esSob,
       nota: nota,
+      labNombre: labNombre,
       creadoEn: firebase.firestore.FieldValue.serverTimestamp()
     };
+    if(turnoEditId) delete turnoData.estado; // no pisar estado al editar
 
     if(turnoEditId){
       await db.collection('turnos').doc(turnoEditId).update(turnoData);
@@ -1150,13 +1259,16 @@ function verDetalle(id){
       <label class="flbl">Nota clínica</label>
       <textarea class="finput" id="detNota" style="min-height:55px;resize:vertical;margin-top:4px">${t.nota||''}</textarea>
     </div>
+    ${t.labNombre?`<div style="background:#F3E8FF;border-radius:var(--r);padding:.7rem .9rem;margin-top:.75rem;font-size:13px;border-left:3px solid #7c3aed">🧪 <strong>Laboratorio:</strong> ${t.labNombre}</div>`:''}
     <div style="margin-top:.75rem">
-      <label class="flbl">Estado</label>
-      <select class="fselect" id="detEstado" style="margin-top:4px">
-        <option value="confirmado"${t.estado==='confirmado'?' selected':''}>Confirmado</option>
-        <option value="atendido"${t.estado==='atendido'?' selected':''}>Atendido</option>
-        <option value="cancelado"${t.estado==='cancelado'?' selected':''}>Cancelado</option>
-      </select>
+      <label class="flbl">Estado de asistencia</label>
+      <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+        <button type="button" class="btn-s" style="${t.estado==='espera'?'background:var(--ambarp);border-color:var(--ambar);color:#854F0B;font-weight:600':''}" onclick="cambiarEstadoTurno('${t.id}','espera')">⏳ En espera</button>
+        <button type="button" class="btn-s" style="${t.estado==='dado'||!t.estado?'background:var(--verdep);border-color:var(--verde);color:#0F6E56;font-weight:600':''}" onclick="cambiarEstadoTurno('${t.id}','dado')">✓ Dado</button>
+        <button type="button" class="btn-s" style="${t.estado==='presente'?'background:#d1fae5;border-color:#065f46;color:#065f46;font-weight:600':''}" onclick="cambiarEstadoTurno('${t.id}','presente')">P Presente</button>
+        <button type="button" class="btn-s" style="${t.estado==='asa'?'background:var(--rojop);border-color:var(--rojo);color:#791F1F;font-weight:600':''}" onclick="cambiarEstadoTurno('${t.id}','asa')">ASA Aus. sin aviso</button>
+        <button type="button" class="btn-s" style="${t.estado==='aca'?'background:#FFEAD1;border-color:#BA7517;color:#9A5B0C;font-weight:600':''}" onclick="cambiarEstadoTurno('${t.id}','aca')">ACA Aus. con aviso</button>
+      </div>
     </div>
   `;
   document.getElementById('detFooter').innerHTML=`
@@ -1191,10 +1303,19 @@ async function cancelarTurno(id){
 
 async function guardarDetalle(id){
   const nota=document.getElementById('detNota').value.trim();
-  const estado=document.getElementById('detEstado').value;
-  await db.collection('turnos').doc(id).update({nota,estado});
-  toast('Guardado ✓','ok');
+  await db.collection('turnos').doc(id).update({nota});
+  toast('Nota guardada ✓','ok');
   cerrarModal('mDet');
+}
+
+async function cambiarEstadoTurno(id, estado){
+  try {
+    await db.collection('turnos').doc(id).update({estado});
+    toast('Estado actualizado: '+({espera:'En espera',dado:'Dado',presente:'Presente',asa:'Ausente sin aviso',aca:'Ausente con aviso'}[estado]),'ok');
+    verDetalle(id); // re-render para reflejar el cambio visualmente
+  } catch(e){
+    toast('Error: '+e.message,'err');
+  }
 }
 
 function editarTurno(id){
@@ -1209,6 +1330,11 @@ function editarTurno(id){
     document.getElementById('nServ').value=t.servicio||'';
     document.getElementById('nNota').value=t.nota||'';
     document.getElementById('nSobre').checked=t.esSobreturno||false;
+    if(t.labNombre){
+      document.getElementById('nTieneLab').checked=true;
+      toggleLabSelect();
+      setTimeout(()=>{ document.getElementById('nLab').value=t.labNombre; },50);
+    }
   },200);
 }
 
@@ -1565,6 +1691,83 @@ async function guardarPaciente(){
     toast('Paciente creado ✓','ok');
   }
   cerrarModal('mNuevoPac');
+}
+
+// ── LABORATORIOS ─────────────────────────────────────────────
+function toggleLabSelect(){
+  const checked = document.getElementById('nTieneLab').checked;
+  const wrap = document.getElementById('labSelectWrap');
+  wrap.classList.toggle('hidden', !checked);
+  if(checked) poblarLabSelect();
+}
+function poblarLabSelect(){
+  const sel = document.getElementById('nLab');
+  sel.innerHTML = LABORATORIOS.map(l=>`<option value="${l}">${l}</option>`).join('');
+}
+function agregarLabNuevo(){
+  const nuevo = prompt('Nombre del nuevo laboratorio:');
+  if(nuevo && nuevo.trim()){
+    LABORATORIOS.push(nuevo.trim());
+    poblarLabSelect();
+    document.getElementById('nLab').value = nuevo.trim();
+  }
+}
+
+// ── SIDEBARS COLAPSABLES ─────────────────────────────────────
+let sbIzqOculto = false;
+let sbDerOculto = false;
+function toggleSidebar(lado){
+  const layout = document.getElementById('secLayout');
+  if(lado==='izq'){
+    sbIzqOculto = !sbIzqOculto;
+    layout.classList.toggle('no-izq', sbIzqOculto);
+    document.getElementById('btnToggleIzq').textContent = sbIzqOculto ? '›' : '‹';
+  } else {
+    sbDerOculto = !sbDerOculto;
+    layout.classList.toggle('no-der', sbDerOculto);
+    document.getElementById('btnToggleDer').textContent = sbDerOculto ? '‹' : '›';
+  }
+}
+
+// ── IMPRIMIR LISTADO DEL DÍA ──────────────────────────────────
+function imprimirListadoDia(){
+  const HOY = hoyStr();
+  const ts = turnos.filter(t=>t.fecha===HOY&&t.estado!=='cancelado').sort((a,b)=>a.hora.localeCompare(b.hora));
+  const fechaTit = labelF(HOY);
+  let html = `<html><head><title>Listado del día - Instituto Espejo</title>
+  <style>
+    body{font-family:Arial,sans-serif;padding:20px;color:#222}
+    h1{font-size:18px;border-bottom:2px solid #1A4E7A;padding-bottom:8px;margin-bottom:4px}
+    .sub{color:#666;font-size:13px;margin-bottom:20px}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    th{background:#1A4E7A;color:white;padding:8px;text-align:left}
+    td{padding:7px 8px;border-bottom:1px solid #ddd}
+    tr:nth-child(even){background:#f7f7f7}
+    .lab{color:#7c3aed;font-weight:600}
+  </style></head><body>
+  <h1>Instituto Espejo — Listado de turnos del día</h1>
+  <div class="sub">${fechaTit} · ${ts.length} turno${ts.length!==1?'s':''}</div>
+  <table>
+    <tr><th>Hora</th><th>Paciente</th><th>Teléfono</th><th>Profesional</th><th>Servicio</th><th>Lab</th><th>Estado</th></tr>
+    ${ts.map(t=>{
+      const p=gProf(t.profesionalId);
+      const est={espera:'En espera',dado:'Dado',presente:'Presente',asa:'Ausente s/aviso',aca:'Ausente c/aviso'}[t.estado]||t.estado||'—';
+      return `<tr>
+        <td><strong>${t.hora}</strong></td>
+        <td>${t.pacNombre||'—'}</td>
+        <td>${t.pacTel||'—'}</td>
+        <td>${p?p.ape+', '+p.nom:'—'}</td>
+        <td>${t.servicio||'—'}</td>
+        <td class="lab">${t.labNombre||''}</td>
+        <td>${est}</td>
+      </tr>`;
+    }).join('')}
+  </table>
+  </body></html>`;
+  const win = window.open('','_blank');
+  win.document.write(html);
+  win.document.close();
+  win.print();
 }
 
 // ── UTILS ─────────────────────────────────────────────────────
