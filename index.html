@@ -510,6 +510,20 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
           <button type="button" class="btn-s" style="font-size:11px;margin-top:5px;padding:4px 10px" onclick="agregarLabNuevo()">+ Agregar otro laboratorio</button>
         </div>
       </div>
+      <!-- TURNOS CORRELATIVOS -->
+      <div id="corrSlotsSec" class="hidden">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <label class="flbl" style="margin:0">🔗 Turnos correlativos — seleccioná los slots siguientes</label>
+          <button type="button" class="btn-s" style="font-size:11px;padding:3px 9px" onclick="cerrarCorrelativos()">✕ Cancelar</button>
+        </div>
+        <div class="slots-g" id="corrSlotsGrid" style="max-height:120px"></div>
+      </div>
+      <div style="margin-bottom:.75rem">
+        <button type="button" class="btn-s" id="btnCorr" style="width:100%;justify-content:center;font-size:12.5px;color:var(--azul);border-color:var(--azulp)" onclick="toggleCorrelativos()" disabled>
+          🔗 Agregar turnos correlativos
+        </button>
+      </div>
+
       <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:8px;background:var(--rojop);border-radius:var(--r);border:1px solid rgba(226,75,74,.2)">
         <input type="checkbox" id="nSobre" onchange="actualizarSlots()">
         <span><strong>Sobreturno</strong> — se agrega aunque el horario esté ocupado (se muestra en rojo)</span>
@@ -517,7 +531,6 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
     </div>
     <div class="modal-footer">
       <button class="btn-s" onclick="cerrarModal('mNuevo')">Cancelar</button>
-      <button class="btn-s" onclick="abrirCorrelativos()" title="Agregar múltiples turnos para el mismo paciente">🔗 Turnos correlativos</button>
       <button class="btn-p" onclick="guardarTurno()">Guardar turno</button>
     </div>
   </div>
@@ -1165,6 +1178,13 @@ function abrirNuevoTurno(fecha='', hora='', profId=null){
   document.getElementById('nTieneLab').checked=false;
   document.getElementById('labSelectWrap').classList.add('hidden');
   document.getElementById('nBusRes').style.display='none';
+  // Reset correlativos
+  corrHorasExtra=[];
+  corrModoActivo=false;
+  document.getElementById('corrSlotsSec').classList.add('hidden');
+  document.getElementById('btnCorr').disabled=true;
+  document.getElementById('btnCorr').textContent='🔗 Agregar turnos correlativos';
+  document.getElementById('btnCorr').style.background='';
   // Poblar profesionales
   const sel=document.getElementById('nProf');
   sel.innerHTML=profs.map(p=>`<option value="${p.id}">${p.ape}${p.nom?', '+p.nom:''}</option>`).join('');
@@ -1208,6 +1228,11 @@ function selSlot(btn,h){
   document.querySelectorAll('.slot-btn').forEach(b=>b.classList.remove('sel'));
   btn.classList.add('sel');
   document.getElementById('nHora').value=h;
+  // Habilitar botón de correlativos
+  const btnCorr = document.getElementById('btnCorr');
+  if(btnCorr) btnCorr.disabled=false;
+  // Si ya estaba en modo correlativo, re-renderizar los slots siguientes
+  if(corrModoActivo){ corrHorasExtra=[]; renderCorrSlots(); }
 }
 
 // Buscador paciente en modal
@@ -1302,12 +1327,34 @@ async function guardarTurno(){
       await db.collection('turnos').doc(turnoEditId).update(turnoData);
       toast('Turno actualizado ✓','ok');
     } else {
-      await db.collection('turnos').add(turnoData);
-      toast('Turno guardado ✓','ok');
+      // Guardar turno principal + correlativos en batch
+      const grupoId = corrHorasExtra.length ? 'grp_'+Date.now() : null;
+      if(grupoId) turnoData.grupoCorrelativo = grupoId;
+
+      const batch = db.batch();
+      const refPrincipal = db.collection('turnos').doc();
+      batch.set(refPrincipal, turnoData);
+
+      // Turnos correlativos — mismo prof, misma fecha, mismos datos de paciente
+      corrHorasExtra.forEach(h=>{
+        const refCorr = db.collection('turnos').doc();
+        batch.set(refCorr, {
+          ...turnoData,
+          hora: h,
+          grupoCorrelativo: grupoId,
+          creadoEn: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      });
+
+      await batch.commit();
+      const total = 1 + corrHorasExtra.length;
+      toast(`✓ ${total} turno${total>1?'s':''} guardado${total>1?'s':''}`,'ok');
     }
 
     turnoEditId = null;
     pacSelModal = null;
+    corrHorasExtra = [];
+    corrModoActivo = false;
     cerrarModal('mNuevo');
 
   } catch(e){
@@ -1803,135 +1850,70 @@ async function guardarPaciente(){
   cerrarModal('mNuevoPac');
 }
 
-// ── TURNOS CORRELATIVOS ──────────────────────────────────────
-let corrTurnos = []; // array de turnos a guardar correlativamente
-let corrPaciente = {}; // datos del paciente base
+// ── TURNOS CORRELATIVOS (versión simple) ─────────────────────
+let corrHorasExtra = []; // horas adicionales seleccionadas
+let corrModoActivo = false;
 
-function abrirCorrelativos(){
-  const nom = document.getElementById('nNom').value.trim();
-  const ape = document.getElementById('nApe').value.trim();
-  const tel = document.getElementById('nTel').value.trim();
-  const profId = document.getElementById('nProf').value;
-  const fecha = document.getElementById('nFecha').value;
-  const hora = document.getElementById('nHora').value;
-  const serv = document.getElementById('nServ').value.trim();
-
-  if(!nom&&!ape){ toast('Completá el nombre del paciente primero','err'); return; }
-
-  corrPaciente = { nom, ape, tel, dni: document.getElementById('nDni').value.trim() };
-
-  // Si ya hay un turno seleccionado lo agregamos como primer elemento
-  corrTurnos = hora ? [{profId, fecha, hora, serv: serv||'Consulta', nota:''}] : [];
-
-  document.getElementById('corrPacNombre').textContent = `${ape}, ${nom}`;
-  document.getElementById('corrPacTel').textContent = tel || 'Sin teléfono';
-  renderCorrLista();
-  cerrarModal('mNuevo');
-  abrirModal('mCorrelativos');
+function toggleCorrelativos(){
+  const horaBase = document.getElementById('nHora').value;
+  if(!horaBase){ toast('Primero seleccioná un horario','err'); return; }
+  corrModoActivo = !corrModoActivo;
+  if(corrModoActivo){
+    corrHorasExtra = [];
+    renderCorrSlots();
+    document.getElementById('corrSlotsSec').classList.remove('hidden');
+    document.getElementById('btnCorr').style.background = 'var(--azulp)';
+    document.getElementById('btnCorr').style.fontWeight = '600';
+  } else {
+    cerrarCorrelativos();
+  }
 }
 
-function renderCorrLista(){
-  const el = document.getElementById('corrTurnosLista');
-  if(!corrTurnos.length){
-    el.innerHTML = '<div class="empty">Agregá al menos un turno</div>';
-    return;
-  }
-  el.innerHTML = corrTurnos.map((t,i) => {
-    const p = gProf(t.profId);
-    return `<div class="corr-item">
-      <span class="corr-num">${i+1}.</span>
-      <div style="flex:1;font-size:12.5px">
-        <strong>${p?p.ape+', '+p.nom:'—'}</strong> — ${t.fecha||'Sin fecha'} ${t.hora||'Sin hora'} hs — ${t.serv||'—'}
-      </div>
-      <button class="btn-s" style="font-size:11px;padding:3px 8px;color:var(--rojo)" onclick="elimCorrTurno(${i})">✕</button>
-    </div>`;
+function cerrarCorrelativos(){
+  corrModoActivo = false;
+  corrHorasExtra = [];
+  document.getElementById('corrSlotsSec').classList.add('hidden');
+  document.getElementById('btnCorr').style.background = '';
+  document.getElementById('btnCorr').style.fontWeight = '';
+}
+
+function renderCorrSlots(){
+  const profId = document.getElementById('nProf').value;
+  const fecha  = document.getElementById('nFecha').value;
+  const horaBase = document.getElementById('nHora').value;
+  const grid = document.getElementById('corrSlotsGrid');
+
+  if(!profId||!fecha||!horaBase){ grid.innerHTML='<div class="slot-none">Seleccioná profesional, fecha y horario primero</div>'; return; }
+
+  // Obtener todos los slots del profesional ese día, solo los POSTERIORES al turno base
+  const todosSlots = generarSlots(profId, fecha);
+  const siguientes = todosSlots.filter(s => s.hora > horaBase);
+
+  if(!siguientes.length){ grid.innerHTML='<div class="slot-none">No hay más horarios disponibles después del turno seleccionado</div>'; return; }
+
+  grid.innerHTML = siguientes.map(s => {
+    const seleccionado = corrHorasExtra.includes(s.hora);
+    const deshabilitado = !s.libre && !seleccionado;
+    return `<button class="slot-btn${deshabilitado?' disabled':''}${seleccionado?' sel':''}"
+      data-hora="${s.hora}"
+      onclick="toggleCorrSlot('${s.hora}',${s.libre})"
+      ${deshabilitado?'disabled':''}
+      style="${seleccionado?'background:var(--azul);color:white;border-color:var(--azul)':''}">
+      ${s.hora}${seleccionado?' ✓':''}
+    </button>`;
   }).join('');
 }
 
-function agregarTurnoCorrelativo(){
-  // Abrir form rápido en el modal
-  const el = document.getElementById('corrTurnosLista');
-  const idx = corrTurnos.length;
-
-  const profOpts = profs.map(p=>`<option value="${p.id}">${p.ape}${p.nom?', '+p.nom:''}</option>`).join('');
-
-  el.innerHTML += `<div class="corr-item" id="corrNew${idx}" style="flex-direction:column;gap:6px">
-    <div style="font-size:11px;font-weight:600;color:var(--azul)">Turno ${idx+1}</div>
-    <div class="corr-form-row">
-      <input type="date" class="finput" id="cnFecha${idx}" style="font-size:12px;padding:5px 8px">
-      <select class="fselect" id="cnProf${idx}" style="font-size:12px;padding:5px 8px">${profOpts}</select>
-      <input type="time" class="finput" id="cnHora${idx}" style="font-size:12px;padding:5px 8px">
-    </div>
-    <input class="finput" id="cnServ${idx}" placeholder="Servicio / Motivo" style="font-size:12px;padding:5px 8px">
-    <div style="display:flex;gap:6px;justify-content:flex-end">
-      <button class="btn-s" style="font-size:11px;padding:4px 10px;color:var(--rojo)" onclick="cancelarCorrNuevo(${idx})">Cancelar</button>
-      <button class="btn-p" style="font-size:11px;padding:4px 10px" onclick="confirmarCorrTurno(${idx})">Agregar</button>
-    </div>
-  </div>`;
-}
-
-function confirmarCorrTurno(idx){
-  const fecha = document.getElementById('cnFecha'+idx)?.value;
-  const profId = document.getElementById('cnProf'+idx)?.value;
-  const hora = document.getElementById('cnHora'+idx)?.value;
-  const serv = document.getElementById('cnServ'+idx)?.value||'Consulta';
-  if(!fecha||!hora||!profId){ toast('Completá fecha, profesional y hora','err'); return; }
-  corrTurnos.push({profId, fecha, hora: hora.substring(0,5), serv});
-  renderCorrLista();
-}
-
-function cancelarCorrNuevo(idx){
-  const el = document.getElementById('corrNew'+idx);
-  if(el) el.remove();
-}
-
-function elimCorrTurno(idx){
-  corrTurnos.splice(idx,1);
-  renderCorrLista();
-}
-
-async function guardarTurnosCorrelativos(){
-  if(!corrTurnos.length){ toast('Agregá al menos un turno','err'); return; }
-
-  // Buscar o crear paciente
-  let pacId = null;
-  const exist = pacientes.find(p=>p.dni&&p.dni===corrPaciente.dni&&corrPaciente.dni!=='');
-  if(exist){
-    pacId = exist.id;
-  } else {
-    const ref = await db.collection('pacientes').add({
-      nom: corrPaciente.nom, ape: corrPaciente.ape,
-      dni: corrPaciente.dni||'', telefono: corrPaciente.tel||'',
-      creadoEn: firebase.firestore.FieldValue.serverTimestamp()
-    });
-    pacId = ref.id;
-  }
-
-  const grupoId = 'grp_' + Date.now();
-  const pacNombre = (corrPaciente.nom+' '+corrPaciente.ape).trim();
-
-  try {
-    const batch = db.batch();
-    corrTurnos.forEach(t=>{
-      const ref = db.collection('turnos').doc();
-      batch.set(ref, {
-        profesionalId: t.profId,
-        pacienteId: pacId,
-        pacNombre,
-        pacTel: corrPaciente.tel||'',
-        fecha: t.fecha, hora: t.hora, servicio: t.serv,
-        estado: 'dado', esSobreturno: false, nota: '',
-        grupoCorrelativo: grupoId,
-        creadoEn: firebase.firestore.FieldValue.serverTimestamp()
-      });
-    });
-    await batch.commit();
-    toast(`✓ ${corrTurnos.length} turnos correlativos guardados`,'ok');
-    cerrarModal('mCorrelativos');
-    corrTurnos = [];
-  } catch(e){
-    toast('Error: '+e.message,'err');
-  }
+function toggleCorrSlot(hora, libre){
+  const idx = corrHorasExtra.indexOf(hora);
+  if(idx>=0){ corrHorasExtra.splice(idx,1); }
+  else { corrHorasExtra.push(hora); corrHorasExtra.sort(); }
+  renderCorrSlots();
+  // Mostrar resumen
+  const resumen = corrHorasExtra.length
+    ? `🔗 ${corrHorasExtra.length} turno${corrHorasExtra.length>1?'s':''} extra: ${corrHorasExtra.join(', ')} hs`
+    : '🔗 Agregar turnos correlativos';
+  document.getElementById('btnCorr').textContent = resumen;
 }
 
 // ── BLOQUEAR SLOT ─────────────────────────────────────────────
