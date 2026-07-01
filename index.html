@@ -64,6 +64,35 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
 .toggle-izq-wrap{display:flex;align-items:flex-start}
 .toggle-der-wrap{display:flex;align-items:flex-start;justify-content:flex-end}
 
+/* Turnos bloqueados */
+.ag-table td.bloqueado{background:repeating-linear-gradient(135deg,#fef3f3,#fef3f3 5px,#fde8e8 5px,#fde8e8 10px)!important;cursor:not-allowed}
+.ag-table td.bloqueado:hover{background:repeating-linear-gradient(135deg,#fef3f3,#fef3f3 5px,#fde8e8 5px,#fde8e8 10px)!important}
+.blk-lbl{font-size:10px;color:#B91C1C;font-style:italic;padding:2px 4px}
+
+/* Correlativos */
+.corr-item{display:flex;align-items:center;gap:6px;padding:7px;background:var(--gc);border-radius:var(--r);margin-bottom:5px;border:1px solid var(--bor)}
+.corr-num{font-size:11px;font-weight:600;color:var(--gm);min-width:20px}
+.corr-badge{font-size:10px;background:var(--azulp);color:var(--azul);padding:2px 7px;border-radius:12px;font-weight:500;cursor:pointer}
+.corr-badge:hover{background:var(--azul);color:white}
+
+/* Vista médico en vivo */
+.vivo-row{display:flex;align-items:center;gap:10px;padding:10px 1rem;border-bottom:1px solid var(--bor);transition:.1s;cursor:pointer}
+.vivo-row:last-child{border-bottom:none}
+.vivo-row:hover{background:var(--gc)}
+.vivo-hora{font-size:14px;font-weight:600;color:var(--azul);min-width:48px}
+.vivo-nom{font-size:13.5px;font-weight:500}
+.vivo-det{font-size:11.5px;color:var(--gm);margin-top:1px}
+.badge-sala{background:#FFF3CD;color:#856404;border:1px solid #FFDA6A;font-size:11px;padding:3px 9px;border-radius:20px;font-weight:500;white-space:nowrap}
+.badge-pres{background:#d1fae5;color:#065f46;border:1px solid #6EE7B7;font-size:11px;padding:3px 9px;border-radius:20px;font-weight:500;white-space:nowrap}
+.badge-asa{background:var(--rojop);color:var(--rojo);border:1px solid #FCA5A5;font-size:11px;padding:3px 9px;border-radius:20px;font-weight:500;white-space:nowrap}
+.badge-aca{background:#FFEAD1;color:#9A5B0C;border:1px solid #FCD34D;font-size:11px;padding:3px 9px;border-radius:20px;font-weight:500;white-space:nowrap}
+.badge-dado{background:var(--verdep);color:#0F6E56;border:1px solid #6EE7B7;font-size:11px;padding:3px 9px;border-radius:20px;font-weight:500;white-space:nowrap}
+.badge-espera{background:var(--ambarp);color:#854F0B;border:1px solid #FCD34D;font-size:11px;padding:3px 9px;border-radius:20px;font-weight:500;white-space:nowrap}
+
+/* Modal correlativos */
+.corr-form-row{display:grid;grid-template-columns:100px 1fr 120px;gap:6px;margin-bottom:6px;align-items:center}
+
+
 /* SIDEBAR IZQ */
 .sb-izq{background:white;border-right:1px solid var(--bor);padding:.75rem 0;overflow-y:auto}
 .sb-lbl{font-size:10px;font-weight:600;color:var(--gm);letter-spacing:1px;text-transform:uppercase;padding:0 .75rem 5px}
@@ -326,6 +355,9 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
           </div>
           <button class="btn-s" onclick="irHoy()">Hoy</button>
           <div class="ml-auto"></div>
+          <button class="btn-s" onclick="abrirBloquearSlot()" title="Anular un horario puntual" style="color:#B91C1C;border-color:rgba(185,28,28,.3)">
+            🚫 Anular horario
+          </button>
           <button class="btn-s" onclick="imprimirListadoDia()" title="Imprimir listado de pacientes del día">
             🖨️ Imprimir
           </button>
@@ -485,6 +517,7 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
     </div>
     <div class="modal-footer">
       <button class="btn-s" onclick="cerrarModal('mNuevo')">Cancelar</button>
+      <button class="btn-s" onclick="abrirCorrelativos()" title="Agregar múltiples turnos para el mismo paciente">🔗 Turnos correlativos</button>
       <button class="btn-p" onclick="guardarTurno()">Guardar turno</button>
     </div>
   </div>
@@ -587,6 +620,47 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
     <div class="modal-footer">
       <button class="btn-s" onclick="cerrarModal('mNuevoPac')">Cancelar</button>
       <button class="btn-p" onclick="guardarPaciente()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL TURNOS CORRELATIVOS -->
+<div class="overlay" id="mCorrelativos">
+  <div class="modal" style="width:640px">
+    <div class="modal-hdr"><span class="modal-tit">Turnos correlativos</span><button class="modal-x" onclick="cerrarModal('mCorrelativos')">×</button></div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--gm);margin-bottom:1rem">Agendá múltiples turnos para el mismo paciente. Pueden ser distintos días y profesionales.</p>
+      <div style="background:var(--azulp);border-radius:var(--r);padding:.85rem;margin-bottom:1rem;font-size:13px">
+        <strong id="corrPacNombre">—</strong> — <span id="corrPacTel" style="color:var(--gm)">—</span>
+      </div>
+      <div id="corrTurnosLista"></div>
+      <button class="btn-s" style="width:100%;justify-content:center;margin-top:8px;font-size:13px" onclick="agregarTurnoCorrelativo()">
+        + Agregar otro turno
+      </button>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-s" onclick="cerrarModal('mCorrelativos')">Cancelar</button>
+      <button class="btn-p" onclick="guardarTurnosCorrelativos()">💾 Guardar todos los turnos</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL BLOQUEAR SLOT -->
+<div class="overlay" id="mBloquear">
+  <div class="modal" style="width:420px">
+    <div class="modal-hdr" style="background:#B91C1C"><span class="modal-tit">Anular horario</span><button class="modal-x" onclick="cerrarModal('mBloquear')">×</button></div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--gm);margin-bottom:1rem">Bloqueá este horario para que no aparezca disponible. El slot queda reservado sin paciente.</p>
+      <div class="fg"><label class="flbl">Profesional</label><select class="fselect" id="blkProf"></select></div>
+      <div class="frow">
+        <div class="fg"><label class="flbl">Fecha</label><input class="finput" type="date" id="blkFecha"></div>
+        <div class="fg"><label class="flbl">Hora</label><input class="finput" type="time" id="blkHora"></div>
+      </div>
+      <div class="fg"><label class="flbl">Motivo</label><input class="finput" id="blkMotivo" placeholder="Ej: Acto oficial, salida del doctor..."></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-s" onclick="cerrarModal('mBloquear')">Cancelar</button>
+      <button class="btn-p" style="background:#B91C1C" onclick="guardarBloqueo()">Anular horario</button>
     </div>
   </div>
 </div>
@@ -906,9 +980,27 @@ function renderAgenda(){
         </div>`;
       }).join('');
 
-      const cellClass = [esH?'hoy':'', noTrabaja?'no-trabaja':''].filter(Boolean).join(' ');
-      const cellClick = noTrabaja ? '' : `onclick="celdaClick('${fs}','${hora}')"`;
-      tbody+=`<td class="${cellClass}" ${cellClick}>${bloques}</td>`;
+      // Verificar si hay bloqueo en este slot
+      const bloqueo = turnos.find(t=>t.profesionalId===(profFiltro!=='todos'?profFiltro:null)&&t.fecha===fs&&t.hora===hora&&t.estado==='bloqueado');
+      const esBloqueado = !!bloqueo && profFiltro!=='todos';
+
+      let cellClass = [esH?'hoy':'', noTrabaja&&!esBloqueado?'no-trabaja':'', esBloqueado?'bloqueado':''].filter(Boolean).join(' ');
+      
+      let cellContent = bloques;
+      if(esBloqueado){
+        cellContent = `<div class="blk-lbl">🚫 ${bloqueo.nota||'Bloqueado'}</div>`;
+      }
+
+      // noTrabaja pero clickeable para sobreturno de urgencia
+      let cellClick = '';
+      if(!esBloqueado){
+        if(noTrabaja){
+          cellClick = `onclick="celdaClickUrgente('${fs}','${hora}')"`;
+        } else {
+          cellClick = `onclick="celdaClick('${fs}','${hora}')"`;
+        }
+      }
+      tbody+=`<td class="${cellClass}" ${cellClick} title="${noTrabaja&&!esBloqueado?'Clic para sobreturno de urgencia':''}">${cellContent}</td>`;
     }
     tbody += '</tr>';
   });
@@ -1384,15 +1476,33 @@ function renderVistaMedico(){
     const trab=p.hs.some(h=>h.d===d.getDay());
     tEl.innerHTML=`<div class="empty">${trab?'Sin turnos para este día':'No trabaja este día'}</div>`;
   } else {
+    const HOY2=hoyStr();
+    const esHoyDoc=diaSelDoc===HOY2;
+    const badgeMap={
+      espera:`<span class="badge-espera">⏳ En espera</span>`,
+      dado:`<span class="badge-dado">✓ Dado</span>`,
+      presente:`<span class="badge-pres">✅ Presente</span>`,
+      asa:`<span class="badge-asa">ASA</span>`,
+      aca:`<span class="badge-aca">ACA</span>`,
+      cancelado:`<span class="badge-asa">Cancelado</span>`,
+      bloqueado:`<span class="badge-asa">🚫 Bloqueado</span>`
+    };
     tEl.innerHTML=ts.map(t=>`
-      <div class="dt-item${t.esSobreturno?' sobre':''}" onclick="verDetalle('${t.id}')">
-        <div style="font-size:19px;font-weight:500;min-width:52px;color:${p.color}">${t.hora}</div>
+      <div class="vivo-row${t.esSobreturno?' sobre':''}" onclick="verDetalle('${t.id}')">
+        <div class="vivo-hora" style="color:${p.color}">${t.hora}</div>
         <div style="flex:1">
-          <div style="font-size:14px;font-weight:500">${t.pacNombre||'—'}</div>
-          <div style="font-size:12px;color:var(--gm);margin-top:2px">${t.servicio||'—'} · 📱 ${t.pacTel||'—'}</div>
-          ${t.nota?`<div style="font-size:11.5px;color:var(--ambar);margin-top:2px;font-style:italic">⚠️ ${t.nota}</div>`:''}
+          <div class="vivo-nom">${t.pacNombre||'—'} ${t.esSobreturno?'<small style="background:#E24B4A;color:white;border-radius:3px;padding:0 4px;font-size:9px">ST</small>':''} ${t.labNombre?`<span title="Lab: ${t.labNombre}" style="font-size:12px">🧪</span>`:''}</div>
+          <div class="vivo-det">${t.servicio||'—'} · 📱 ${t.pacTel||'—'}</div>
+          ${t.nota?`<div style="font-size:11px;color:var(--ambar);margin-top:2px;font-style:italic">⚠️ ${t.nota}</div>`:''}
         </div>
-        ${t.esSobreturno?'<span class="pill sobre">ST</span>':''}
+        <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
+          ${badgeMap[t.estado||'dado']||''}
+          ${esHoyDoc?`<div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end">
+            <button class="btn-s" style="font-size:10px;padding:3px 7px;background:${t.estado==='espera'?'var(--ambarp)':''}" onclick="event.stopPropagation();cambiarEstadoTurno('${t.id}','espera')">Sala espera</button>
+            <button class="btn-s" style="font-size:10px;padding:3px 7px;background:${t.estado==='presente'?'var(--verdep)':''}" onclick="event.stopPropagation();cambiarEstadoTurno('${t.id}','presente')">Presente</button>
+            <button class="btn-s" style="font-size:10px;padding:3px 7px;color:var(--rojo)" onclick="event.stopPropagation();cambiarEstadoTurno('${t.id}','asa')">ASA</button>
+          </div>`:''}
+        </div>
       </div>
     `).join('');
   }
@@ -1691,6 +1801,186 @@ async function guardarPaciente(){
     toast('Paciente creado ✓','ok');
   }
   cerrarModal('mNuevoPac');
+}
+
+// ── TURNOS CORRELATIVOS ──────────────────────────────────────
+let corrTurnos = []; // array de turnos a guardar correlativamente
+let corrPaciente = {}; // datos del paciente base
+
+function abrirCorrelativos(){
+  const nom = document.getElementById('nNom').value.trim();
+  const ape = document.getElementById('nApe').value.trim();
+  const tel = document.getElementById('nTel').value.trim();
+  const profId = document.getElementById('nProf').value;
+  const fecha = document.getElementById('nFecha').value;
+  const hora = document.getElementById('nHora').value;
+  const serv = document.getElementById('nServ').value.trim();
+
+  if(!nom&&!ape){ toast('Completá el nombre del paciente primero','err'); return; }
+
+  corrPaciente = { nom, ape, tel, dni: document.getElementById('nDni').value.trim() };
+
+  // Si ya hay un turno seleccionado lo agregamos como primer elemento
+  corrTurnos = hora ? [{profId, fecha, hora, serv: serv||'Consulta', nota:''}] : [];
+
+  document.getElementById('corrPacNombre').textContent = `${ape}, ${nom}`;
+  document.getElementById('corrPacTel').textContent = tel || 'Sin teléfono';
+  renderCorrLista();
+  cerrarModal('mNuevo');
+  abrirModal('mCorrelativos');
+}
+
+function renderCorrLista(){
+  const el = document.getElementById('corrTurnosLista');
+  if(!corrTurnos.length){
+    el.innerHTML = '<div class="empty">Agregá al menos un turno</div>';
+    return;
+  }
+  el.innerHTML = corrTurnos.map((t,i) => {
+    const p = gProf(t.profId);
+    return `<div class="corr-item">
+      <span class="corr-num">${i+1}.</span>
+      <div style="flex:1;font-size:12.5px">
+        <strong>${p?p.ape+', '+p.nom:'—'}</strong> — ${t.fecha||'Sin fecha'} ${t.hora||'Sin hora'} hs — ${t.serv||'—'}
+      </div>
+      <button class="btn-s" style="font-size:11px;padding:3px 8px;color:var(--rojo)" onclick="elimCorrTurno(${i})">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function agregarTurnoCorrelativo(){
+  // Abrir form rápido en el modal
+  const el = document.getElementById('corrTurnosLista');
+  const idx = corrTurnos.length;
+
+  const profOpts = profs.map(p=>`<option value="${p.id}">${p.ape}${p.nom?', '+p.nom:''}</option>`).join('');
+
+  el.innerHTML += `<div class="corr-item" id="corrNew${idx}" style="flex-direction:column;gap:6px">
+    <div style="font-size:11px;font-weight:600;color:var(--azul)">Turno ${idx+1}</div>
+    <div class="corr-form-row">
+      <input type="date" class="finput" id="cnFecha${idx}" style="font-size:12px;padding:5px 8px">
+      <select class="fselect" id="cnProf${idx}" style="font-size:12px;padding:5px 8px">${profOpts}</select>
+      <input type="time" class="finput" id="cnHora${idx}" style="font-size:12px;padding:5px 8px">
+    </div>
+    <input class="finput" id="cnServ${idx}" placeholder="Servicio / Motivo" style="font-size:12px;padding:5px 8px">
+    <div style="display:flex;gap:6px;justify-content:flex-end">
+      <button class="btn-s" style="font-size:11px;padding:4px 10px;color:var(--rojo)" onclick="cancelarCorrNuevo(${idx})">Cancelar</button>
+      <button class="btn-p" style="font-size:11px;padding:4px 10px" onclick="confirmarCorrTurno(${idx})">Agregar</button>
+    </div>
+  </div>`;
+}
+
+function confirmarCorrTurno(idx){
+  const fecha = document.getElementById('cnFecha'+idx)?.value;
+  const profId = document.getElementById('cnProf'+idx)?.value;
+  const hora = document.getElementById('cnHora'+idx)?.value;
+  const serv = document.getElementById('cnServ'+idx)?.value||'Consulta';
+  if(!fecha||!hora||!profId){ toast('Completá fecha, profesional y hora','err'); return; }
+  corrTurnos.push({profId, fecha, hora: hora.substring(0,5), serv});
+  renderCorrLista();
+}
+
+function cancelarCorrNuevo(idx){
+  const el = document.getElementById('corrNew'+idx);
+  if(el) el.remove();
+}
+
+function elimCorrTurno(idx){
+  corrTurnos.splice(idx,1);
+  renderCorrLista();
+}
+
+async function guardarTurnosCorrelativos(){
+  if(!corrTurnos.length){ toast('Agregá al menos un turno','err'); return; }
+
+  // Buscar o crear paciente
+  let pacId = null;
+  const exist = pacientes.find(p=>p.dni&&p.dni===corrPaciente.dni&&corrPaciente.dni!=='');
+  if(exist){
+    pacId = exist.id;
+  } else {
+    const ref = await db.collection('pacientes').add({
+      nom: corrPaciente.nom, ape: corrPaciente.ape,
+      dni: corrPaciente.dni||'', telefono: corrPaciente.tel||'',
+      creadoEn: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    pacId = ref.id;
+  }
+
+  const grupoId = 'grp_' + Date.now();
+  const pacNombre = (corrPaciente.nom+' '+corrPaciente.ape).trim();
+
+  try {
+    const batch = db.batch();
+    corrTurnos.forEach(t=>{
+      const ref = db.collection('turnos').doc();
+      batch.set(ref, {
+        profesionalId: t.profId,
+        pacienteId: pacId,
+        pacNombre,
+        pacTel: corrPaciente.tel||'',
+        fecha: t.fecha, hora: t.hora, servicio: t.serv,
+        estado: 'dado', esSobreturno: false, nota: '',
+        grupoCorrelativo: grupoId,
+        creadoEn: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    });
+    await batch.commit();
+    toast(`✓ ${corrTurnos.length} turnos correlativos guardados`,'ok');
+    cerrarModal('mCorrelativos');
+    corrTurnos = [];
+  } catch(e){
+    toast('Error: '+e.message,'err');
+  }
+}
+
+// ── BLOQUEAR SLOT ─────────────────────────────────────────────
+function abrirBloquearSlot(fecha='', hora='', profId=''){
+  const sel = document.getElementById('blkProf');
+  sel.innerHTML = profs.map(p=>`<option value="${p.id}">${p.ape}${p.nom?', '+p.nom:''}</option>`).join('');
+  if(profId) sel.value=profId;
+  else if(profFiltro!=='todos') sel.value=profFiltro;
+  document.getElementById('blkFecha').value = fecha||hoyStr();
+  document.getElementById('blkHora').value = hora||'';
+  document.getElementById('blkMotivo').value = '';
+  abrirModal('mBloquear');
+}
+
+async function guardarBloqueo(){
+  const profId = document.getElementById('blkProf').value;
+  const fecha = document.getElementById('blkFecha').value;
+  const hora = document.getElementById('blkHora').value;
+  const motivo = document.getElementById('blkMotivo').value.trim();
+  if(!profId||!fecha||!hora){ toast('Completá todos los campos','err'); return; }
+  try {
+    await db.collection('turnos').add({
+      profesionalId: profId,
+      pacienteId: null,
+      pacNombre: '— Bloqueado —',
+      pacTel: '',
+      fecha, hora: hora.substring(0,5),
+      servicio: 'Bloqueado',
+      estado: 'bloqueado',
+      nota: motivo||'Bloqueado',
+      esSobreturno: false,
+      creadoEn: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    toast('Horario anulado ✓','ok');
+    cerrarModal('mBloquear');
+  } catch(e){
+    toast('Error: '+e.message,'err');
+  }
+}
+
+// ── CELDA URGENTE (día no trabaja) ────────────────────────────
+function celdaClickUrgente(fecha, hora){
+  if(!confirm(`¿Querés agregar un SOBRETURNO de urgencia el ${labelF(fecha)} a las ${hora} hs? (El profesional no trabaja ese día)`)) return;
+  abrirNuevoTurno(fecha, hora, profFiltro!=='todos'?profFiltro:null);
+  // Pre-marcar sobreturno
+  setTimeout(()=>{ 
+    document.getElementById('nSobre').checked=true; 
+    actualizarSlots();
+  },300);
 }
 
 // ── LABORATORIOS ─────────────────────────────────────────────
