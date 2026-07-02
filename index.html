@@ -358,9 +358,7 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
           <button class="btn-s" onclick="abrirBloquearSlot()" title="Anular un horario puntual" style="color:#B91C1C;border-color:rgba(185,28,28,.3)">
             🚫 Anular horario
           </button>
-          <button class="btn-s" onclick="imprimirListadoDia()" title="Imprimir listado de pacientes del día">
-            🖨️ Imprimir
-          </button>
+
           <button class="btn-p" onclick="abrirNuevoTurno()">
             <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="white" stroke-width="2.2"><path d="M7 2v10M2 7h10"/></svg>
             Nuevo turno
@@ -423,6 +421,7 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
         <div><div style="font-size:15px;font-weight:500" id="docNomEl">—</div><div style="font-size:12px;color:var(--gm)" id="docEspEl">—</div></div>
         <div class="ml-auto"></div>
         <span style="font-size:12px;color:var(--gm)">Hoy: <strong id="docHoyN">—</strong></span>
+        <button class="btn-s" onclick="imprimirListadoMedico()" title="Imprimir turnos del profesional del día seleccionado">🖨️ Imprimir mi agenda</button>
         <button class="btn-p" onclick="abrirNuevoTurno()">+ Nuevo turno</button>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:1rem;padding-bottom:.85rem;border-bottom:1px solid var(--bor)" id="docPills"></div>
@@ -660,14 +659,16 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
 
 <!-- MODAL BLOQUEAR SLOT -->
 <div class="overlay" id="mBloquear">
-  <div class="modal" style="width:420px">
+  <div class="modal" style="width:460px">
     <div class="modal-hdr" style="background:#B91C1C"><span class="modal-tit">Anular horario</span><button class="modal-x" onclick="cerrarModal('mBloquear')">×</button></div>
     <div class="modal-body">
-      <p style="font-size:13px;color:var(--gm);margin-bottom:1rem">Bloqueá este horario para que no aparezca disponible. El slot queda reservado sin paciente.</p>
-      <div class="fg"><label class="flbl">Profesional</label><select class="fselect" id="blkProf"></select></div>
-      <div class="frow">
-        <div class="fg"><label class="flbl">Fecha</label><input class="finput" type="date" id="blkFecha"></div>
-        <div class="fg"><label class="flbl">Hora</label><input class="finput" type="time" id="blkHora"></div>
+      <p style="font-size:13px;color:var(--gm);margin-bottom:1rem">Bloqueá este horario para que no aparezca disponible. El slot queda marcado en rojo en la agenda.</p>
+      <div class="fg"><label class="flbl">Profesional</label><select class="fselect" id="blkProf" onchange="actualizarSlotsBloqueo()"></select></div>
+      <div class="fg"><label class="flbl">Fecha</label><input class="finput" type="date" id="blkFecha" onchange="actualizarSlotsBloqueo()"></div>
+      <div class="fg">
+        <label class="flbl">Seleccioná el horario a anular</label>
+        <div class="slots-g" id="blkSlotsGrid"><div class="slot-none">Seleccioná profesional y fecha</div></div>
+        <input type="hidden" id="blkHora">
       </div>
       <div class="fg"><label class="flbl">Motivo</label><input class="finput" id="blkMotivo" placeholder="Ej: Acto oficial, salida del doctor..."></div>
     </div>
@@ -680,6 +681,30 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
 
 <!-- TOAST -->
 <div class="toast" id="toastEl"><span id="toastMsg"></span></div>
+
+<!-- PÁGINA PÚBLICA DE CONFIRMACIÓN -->
+<div id="pgConfirmar" style="display:none;min-height:100vh;background:linear-gradient(135deg,#1A4E7A,#2E6FAD);align-items:center;justify-content:center;padding:1rem">
+  <div style="background:white;border-radius:16px;padding:2rem;max-width:420px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.25)">
+    <div style="font-family:'Playfair Display',serif;font-size:1.4rem;color:#1A4E7A;margin-bottom:.25rem">Instituto Espejo</div>
+    <div style="font-size:12px;color:#888;margin-bottom:1.5rem">San Rafael, Mendoza · ☎ 2604396462</div>
+    <div id="cfBody">
+      <div style="font-size:2rem;margin-bottom:.75rem">🦷</div>
+      <div style="font-size:16px;font-weight:500;margin-bottom:.5rem" id="cfNombre">Cargando...</div>
+      <div style="font-size:13px;color:#666;margin-bottom:1.5rem" id="cfDetalle"></div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <button onclick="responderConfirmacion('presente')" style="background:#1D9E75;border:none;color:white;border-radius:10px;padding:14px;font-size:15px;font-weight:500;cursor:pointer;font-family:'Inter',sans-serif">
+          ✅ Sí, voy a asistir
+        </button>
+        <button onclick="responderConfirmacion('aca')" style="background:#BA7517;border:none;color:white;border-radius:10px;padding:14px;font-size:15px;font-weight:500;cursor:pointer;font-family:'Inter',sans-serif">
+          📅 No puedo — quiero reprogramar
+        </button>
+        <button onclick="responderConfirmacion('asa')" style="background:#E24B4A;border:none;color:white;border-radius:10px;padding:14px;font-size:15px;font-weight:500;cursor:pointer;font-family:'Inter',sans-serif">
+          ❌ No voy a asistir
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script>
 // ══════════════════════════════════════════════════════════════
@@ -815,10 +840,82 @@ function generarSlots(profId, fecha){
 }
 
 // ── AUTH ─────────────────────────────────────────────────────
-auth.onAuthStateChanged(user=>{
-  if(user){ mostrarApp(); }
-  else { mostrarLogin(); }
-});
+// ── DETECCIÓN DE PÁGINA DE CONFIRMACIÓN PÚBLICA ──────────────
+const urlParams = new URLSearchParams(window.location.search);
+const turnoConfirmarId = urlParams.get('confirmar');
+
+if(turnoConfirmarId){
+  // Mostrar solo la página de confirmación pública
+  document.getElementById('pgConfirmar').style.display='flex';
+  cargarTurnoConfirmacion(turnoConfirmarId);
+} else {
+  // App normal con auth
+  auth.onAuthStateChanged(user=>{
+    if(user){ mostrarApp(); }
+    else { mostrarLogin(); }
+  });
+}
+
+async function cargarTurnoConfirmacion(turnoId){
+  try {
+    const snap = await db.collection('turnos').doc(turnoId).get();
+    if(!snap.exists){
+      document.getElementById('cfBody').innerHTML = '<div style="color:#E24B4A;font-size:15px">❌ Turno no encontrado.<br><small style="color:#888">Es posible que haya sido cancelado.</small></div>';
+      return;
+    }
+    const t = snap.data();
+    const MESES_CF = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+    const d = new Date(t.fecha+'T00:00:00');
+    const fechaTxt = `${d.getDate()} de ${MESES_CF[d.getMonth()]} ${d.getFullYear()}`;
+
+    // Obtener profesional (simplificado — buscamos en los datos del turno)
+    document.getElementById('cfNombre').textContent = `Hola, ${(t.pacNombre||'').split(' ')[0]} 👋`;
+    document.getElementById('cfDetalle').innerHTML = `
+      <strong>Tu turno:</strong><br>
+      📅 ${fechaTxt} a las <strong>${t.hora} hs</strong><br>
+      🦷 ${t.servicio||'Consulta'}<br>
+      📍 San Rafael, Mendoza
+    `;
+
+    // Si ya respondió, mostrar estado
+    if(t.estado==='presente'){
+      mostrarRespuestaConfirmacion('presente', false);
+    } else if(t.estado==='aca'){
+      mostrarRespuestaConfirmacion('aca', false);
+    } else if(t.estado==='asa'){
+      mostrarRespuestaConfirmacion('asa', false);
+    }
+  } catch(e){
+    document.getElementById('cfBody').innerHTML = `<div style="color:#E24B4A">Error al cargar el turno: ${e.message}</div>`;
+  }
+}
+
+async function responderConfirmacion(respuesta){
+  try {
+    await db.collection('turnos').doc(turnoConfirmarId).update({
+      estado: respuesta,
+      respondioEn: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    mostrarRespuestaConfirmacion(respuesta, true);
+  } catch(e){
+    document.getElementById('cfBody').innerHTML = `<div style="color:#E24B4A">Error: ${e.message}</div>`;
+  }
+}
+
+function mostrarRespuestaConfirmacion(respuesta, nuevo){
+  const msgs = {
+    presente: { ico:'✅', tit:'¡Perfecto!', txt:'Tu asistencia quedó confirmada. ¡Te esperamos!', color:'#1D9E75' },
+    aca:      { ico:'📅', tit:'Entendido', txt:'Anotamos que necesitás reprogramar. La clínica se va a comunicar con vos a la brevedad.', color:'#BA7517' },
+    asa:      { ico:'❌', tit:'Turno cancelado', txt:'Lamentamos que no puedas asistir. Cuando quieras podés pedir un nuevo turno.', color:'#E24B4A' },
+  };
+  const m = msgs[respuesta]||msgs.presente;
+  document.getElementById('cfBody').innerHTML = `
+    <div style="font-size:3rem;margin-bottom:.75rem">${m.ico}</div>
+    <div style="font-size:18px;font-weight:600;color:${m.color};margin-bottom:.75rem">${m.tit}</div>
+    <div style="font-size:14px;color:#555;line-height:1.6">${m.txt}</div>
+    ${nuevo?`<div style="margin-top:1.25rem;font-size:12px;color:#aaa">Respuesta registrada ✓</div>`:'<div style="margin-top:1rem;font-size:12px;color:#aaa">Ya habías respondido anteriormente</div>'}
+  `;
+}
 
 function mostrarLogin(){
   document.getElementById('pgLogin').style.display='flex';
@@ -1059,7 +1156,8 @@ function renderRecordatorios(){
   const waIco='<svg width="16" height="16" viewBox="0 0 20 20" fill="#25D366"><path d="M10 1C5 1 1 5 1 10c0 1.8.5 3.4 1.3 4.8L1 19l4.3-1.3A9 9 0 1 0 10 1z"/></svg>';
   const mkRow=(t)=>{
     const p=gProf(t.profesionalId);
-    const msg=encodeURIComponent(`Hola ${(t.pacNombre||'').split(' ')[0]} 👋 Te recordamos tu turno en *Instituto Espejo* mañana *${labelF(t.fecha)}* a las *${t.hora} hs* con *${p?p.nom+' '+p.ape:'el profesional'}*.\n📍 San Rafael, Mendoza · ☎ ${TEL}\n\nPor favor confirmanos tu asistencia respondiendo este mensaje:\n✅ *SI* — Confirmo que asistiré\n❌ *NO* — No voy a poder asistir\n\n¡Te esperamos! 😊`);
+    const linkConf = `https://institutoespejo.vercel.app/?confirmar=${t.id}`;
+    const msg=encodeURIComponent(`Hola ${(t.pacNombre||'').split(' ')[0]} 👋 Te recordamos tu turno en *Instituto Espejo* mañana *${labelF(t.fecha)}* a las *${t.hora} hs* con *${p?p.nom+' '+p.ape:'el profesional'}*.\n📍 San Rafael, Mendoza · ☎ ${TEL}\n\n👆 Confirmá tu asistencia tocando este link:\n${linkConf}\n\n¡Te esperamos! 😊`);
     return `<div class="rec-row">
       <div class="rec-ico">${waIco}</div>
       <div style="flex:1;min-width:0">
@@ -1081,7 +1179,8 @@ function enviarTodosWA(){
   ts.forEach((t,i)=>{
     setTimeout(()=>{
       const p=gProf(t.profesionalId);
-      const msg=encodeURIComponent(`Hola ${(t.pacNombre||'').split(' ')[0]} 👋 Te recordamos tu turno en *Instituto Espejo* mañana *${labelF(t.fecha)}* a las *${t.hora} hs* con *${p?p.nom+' '+p.ape:'el profesional'}*.\n📍 San Rafael, Mendoza · ☎ ${TEL}\n\nPor favor confirmanos tu asistencia respondiendo este mensaje:\n✅ *SI* — Confirmo que asistiré\n❌ *NO* — No voy a poder asistir\n\n¡Te esperamos! 😊`);
+      const linkConf = `https://institutoespejo.vercel.app/?confirmar=${t.id}`;
+    const msg=encodeURIComponent(`Hola ${(t.pacNombre||'').split(' ')[0]} 👋 Te recordamos tu turno en *Instituto Espejo* mañana *${labelF(t.fecha)}* a las *${t.hora} hs* con *${p?p.nom+' '+p.ape:'el profesional'}*.\n📍 San Rafael, Mendoza · ☎ ${TEL}\n\n👆 Confirmá tu asistencia tocando este link:\n${linkConf}\n\n¡Te esperamos! 😊`);
       window.open(`https://wa.me/549${t.pacTel}?text=${msg}`,'_blank');
     },i*900);
   });
@@ -1417,7 +1516,8 @@ function verDetalle(id){
     <button class="btn-p" onclick="guardarDetalle('${t.id}')">💾 Guardar</button>
     ${t.pacTel?(()=>{
       const p2=gProf(t.profesionalId);
-      const msg=encodeURIComponent('Hola '+t.pacNombre.split(' ')[0]+' 👋 Te recordamos tu turno en *Instituto Espejo* el *'+labelF(t.fecha)+'* a las *'+t.hora+' hs* con *'+(p2?p2.nom+' '+p2.ape:'el profesional')+'*.\n📍 San Rafael, Mendoza · ☎ '+TEL+'\n\nPor favor confirmanos tu asistencia respondiendo este mensaje:\n✅ *SI* — Confirmo que asistiré\n❌ *NO* — No voy a poder asistir\n\n¡Te esperamos! 😊');
+      const linkConf3 = 'https://institutoespejo.vercel.app/?confirmar='+t.id;
+      const msg=encodeURIComponent('Hola '+t.pacNombre.split(' ')[0]+' 👋 Te recordamos tu turno en *Instituto Espejo* el *'+labelF(t.fecha)+'* a las *'+t.hora+' hs* con *'+(p2?p2.nom+' '+p2.ape:'el profesional')+'*.\n📍 San Rafael, Mendoza · ☎ '+TEL+'\n\n👆 Confirmá tu asistencia tocando este link:\n'+linkConf3+'\n\n¡Te esperamos! 😊');
       return `<a href="https://wa.me/549${t.pacTel}?text=${msg}" target="_blank" class="btn-wa">WA</a>`;
     })():''}
   `;
@@ -1925,7 +2025,63 @@ function abrirBloquearSlot(fecha='', hora='', profId=''){
   document.getElementById('blkFecha').value = fecha||hoyStr();
   document.getElementById('blkHora').value = hora||'';
   document.getElementById('blkMotivo').value = '';
+  actualizarSlotsBloqueo();
+  if(hora){
+    setTimeout(()=>{
+      document.querySelectorAll('#blkSlotsGrid .slot-btn').forEach(b=>{
+        if(b.dataset.hora===hora) selSlotBloqueo(b, hora);
+      });
+    },100);
+  }
   abrirModal('mBloquear');
+}
+
+function actualizarSlotsBloqueo(){
+  const profId = document.getElementById('blkProf').value;
+  const fecha  = document.getElementById('blkFecha').value;
+  const grid   = document.getElementById('blkSlotsGrid');
+  document.getElementById('blkHora').value = '';
+  if(!profId||!fecha){ grid.innerHTML='<div class="slot-none">Seleccioná profesional y fecha</div>'; return; }
+
+  // Mostrar TODOS los slots del profesional ese día (libres y ocupados)
+  // Para bloquear también se pueden elegir ocupados (sobrebloqueo)
+  const p = gProf(profId);
+  if(!p){ grid.innerHTML='<div class="slot-none">Profesional no encontrado</div>'; return; }
+  const d = new Date(fecha+'T00:00:00');
+  const dow = d.getDay();
+  const franjas = p.hs.filter(h=>h.d===dow);
+
+  if(!franjas.length){
+    // El profesional no trabaja ese día, igual mostrar slots cada 30 min de 8 a 20
+    grid.innerHTML='<div class="slot-none" style="color:var(--ambar)">⚠️ El profesional no trabaja este día. Podés anular igual para bloquear un sobreturno.</div>';
+    return;
+  }
+
+  const slots = generarSlots(profId, fecha);
+  if(!slots.length){ grid.innerHTML='<div class="slot-none">Sin horarios disponibles</div>'; return; }
+
+  grid.innerHTML = slots.map(s=>`
+    <button class="slot-btn${!s.libre?' disabled':''}"
+      data-hora="${s.hora}"
+      onclick="selSlotBloqueo(this,'${s.hora}')"
+      style="${!s.libre?'border-color:#E24B4A;color:#B91C1C;background:#FFF5F5':''}">
+      ${s.hora}${!s.libre?' 🔒':''}
+    </button>
+  `).join('');
+}
+
+function selSlotBloqueo(btn, hora){
+  document.querySelectorAll('#blkSlotsGrid .slot-btn').forEach(b=>{
+    b.classList.remove('sel');
+    b.style.background='';
+    b.style.color='';
+    b.style.borderColor='';
+  });
+  btn.classList.add('sel');
+  btn.style.background='#B91C1C';
+  btn.style.color='white';
+  btn.style.borderColor='#B91C1C';
+  document.getElementById('blkHora').value = hora;
 }
 
 async function guardarBloqueo(){
@@ -1933,7 +2089,7 @@ async function guardarBloqueo(){
   const fecha = document.getElementById('blkFecha').value;
   const hora = document.getElementById('blkHora').value;
   const motivo = document.getElementById('blkMotivo').value.trim();
-  if(!profId||!fecha||!hora){ toast('Completá todos los campos','err'); return; }
+  if(!profId||!fecha||!hora){ toast('Seleccioná profesional, fecha y horario','err'); return; }
   try {
     await db.collection('turnos').add({
       profesionalId: profId,
@@ -2002,44 +2158,48 @@ function toggleSidebar(lado){
 }
 
 // ── IMPRIMIR LISTADO DEL DÍA ──────────────────────────────────
-function imprimirListadoDia(){
-  const HOY = hoyStr();
-  const ts = turnos.filter(t=>t.fecha===HOY&&t.estado!=='cancelado').sort((a,b)=>a.hora.localeCompare(b.hora));
-  const fechaTit = labelF(HOY);
-  let html = `<html><head><title>Listado del día - Instituto Espejo</title>
+function imprimirListadoMedico(){
+  if(!profSelDoc){ toast('Seleccioná un profesional primero','err'); return; }
+  const p = gProf(profSelDoc);
+  const fecha = diaSelDoc;
+  const ts = turnos
+    .filter(t=>t.profesionalId===profSelDoc&&t.fecha===fecha&&t.estado!=='cancelado')
+    .sort((a,b)=>a.hora.localeCompare(b.hora));
+  const estLabels = {espera:'En espera',dado:'Dado',presente:'Presente',asa:'Ausente s/aviso',aca:'Ausente c/aviso'};
+  let html = `<html><head><title>Agenda - ${p?p.ape+' '+p.nom:''}</title>
   <style>
-    body{font-family:Arial,sans-serif;padding:20px;color:#222}
-    h1{font-size:18px;border-bottom:2px solid #1A4E7A;padding-bottom:8px;margin-bottom:4px}
-    .sub{color:#666;font-size:13px;margin-bottom:20px}
+    body{font-family:Arial,sans-serif;padding:24px;color:#222}
+    h1{font-size:18px;border-bottom:2px solid #1A4E7A;padding-bottom:8px;margin-bottom:3px}
+    h2{font-size:13px;color:#555;font-weight:400;margin-bottom:18px}
     table{width:100%;border-collapse:collapse;font-size:13px}
-    th{background:#1A4E7A;color:white;padding:8px;text-align:left}
-    td{padding:7px 8px;border-bottom:1px solid #ddd}
-    tr:nth-child(even){background:#f7f7f7}
-    .lab{color:#7c3aed;font-weight:600}
+    th{background:#1A4E7A;color:white;padding:8px 10px;text-align:left}
+    td{padding:8px 10px;border-bottom:1px solid #ddd;vertical-align:top}
+    tr:nth-child(even) td{background:#f7f7f7}
+    .lab{color:#7c3aed;font-weight:600;font-size:12px}
+    .nota{font-size:11px;color:#888;font-style:italic}
+    .sobre{color:#B91C1C;font-size:11px;font-weight:600}
+    @media print{body{padding:12px}}
   </style></head><body>
-  <h1>Instituto Espejo — Listado de turnos del día</h1>
-  <div class="sub">${fechaTit} · ${ts.length} turno${ts.length!==1?'s':''}</div>
+  <h1>Instituto Espejo — ${p?p.nom+' '+p.ape:''}</h1>
+  <h2>${p?p.esp:''} · ${labelF(fecha)} · ${ts.length} turno${ts.length!==1?'s':''}</h2>
   <table>
-    <tr><th>Hora</th><th>Paciente</th><th>Teléfono</th><th>Profesional</th><th>Servicio</th><th>Lab</th><th>Estado</th></tr>
-    ${ts.map(t=>{
-      const p=gProf(t.profesionalId);
-      const est={espera:'En espera',dado:'Dado',presente:'Presente',asa:'Ausente s/aviso',aca:'Ausente c/aviso'}[t.estado]||t.estado||'—';
-      return `<tr>
-        <td><strong>${t.hora}</strong></td>
-        <td>${t.pacNombre||'—'}</td>
-        <td>${t.pacTel||'—'}</td>
-        <td>${p?p.ape+', '+p.nom:'—'}</td>
-        <td>${t.servicio||'—'}</td>
-        <td class="lab">${t.labNombre||''}</td>
-        <td>${est}</td>
-      </tr>`;
-    }).join('')}
+    <tr><th>Hora</th><th>Paciente</th><th>Teléfono</th><th>Servicio</th><th>Lab</th><th>Notas</th><th>Estado</th></tr>
+    ${ts.length ? ts.map(t=>`<tr>
+      <td><strong>${t.hora}</strong>${t.esSobreturno?'<br><span class="sobre">ST</span>':''}</td>
+      <td>${t.pacNombre||'—'}</td>
+      <td>${t.pacTel||'—'}</td>
+      <td>${t.servicio||'—'}</td>
+      <td class="lab">${t.labNombre||''}</td>
+      <td class="nota">${t.nota||''}</td>
+      <td>${estLabels[t.estado]||t.estado||'—'}</td>
+    </tr>`).join('') : '<tr><td colspan="7" style="text-align:center;color:#999;padding:20px">Sin turnos para este día</td></tr>'}
   </table>
+  <div style="margin-top:20px;font-size:11px;color:#aaa;text-align:right">Impreso el ${new Date().toLocaleString('es-AR')} · Instituto Espejo</div>
   </body></html>`;
   const win = window.open('','_blank');
   win.document.write(html);
   win.document.close();
-  win.print();
+  setTimeout(()=>win.print(), 300);
 }
 
 // ── UTILS ─────────────────────────────────────────────────────
