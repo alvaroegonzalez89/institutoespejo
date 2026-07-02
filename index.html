@@ -861,6 +861,8 @@ if(turnoConfirmarId){
 
 async function cargarTurnoConfirmacion(turnoId){
   try {
+    // Login anónimo para poder leer/escribir Firestore sin credenciales
+    await auth.signInAnonymously().catch(()=>{}); // silencioso si falla
     const snap = await db.collection('turnos').doc(turnoId).get();
     if(!snap.exists){
       document.getElementById('cfBody').innerHTML = '<div style="color:#E24B4A;font-size:15px">❌ Turno no encontrado.<br><small style="color:#888">Es posible que haya sido cancelado.</small></div>';
@@ -2115,13 +2117,21 @@ async function guardarBloqueo(){
 
 // ── CELDA URGENTE (día no trabaja) ────────────────────────────
 function celdaClickUrgente(fecha, hora){
-  if(!confirm(`¿Querés agregar un SOBRETURNO de urgencia el ${labelF(fecha)} a las ${hora} hs? (El profesional no trabaja ese día)`)) return;
+  if(!confirm(`¿Querés agregar un SOBRETURNO de urgencia el ${labelF(fecha)} a las ${hora} hs?
+(El profesional no trabaja ese día)`)) return;
   abrirNuevoTurno(fecha, hora, profFiltro!=='todos'?profFiltro:null);
-  // Pre-marcar sobreturno
-  setTimeout(()=>{ 
-    document.getElementById('nSobre').checked=true; 
+  setTimeout(()=>{
+    // Tildar sobreturno ANTES de generar los slots
+    document.getElementById('nSobre').checked=true;
+    // Llamar actualizarSlots que ahora detecta esSobre=true y genera slots urgentes
     actualizarSlots();
-  },300);
+    // Pre-seleccionar el horario que se clickeó en la agenda
+    setTimeout(()=>{
+      document.querySelectorAll('#nSlots .slot-btn').forEach(b=>{
+        if(b.dataset.hora===hora && !b.disabled) selSlot(b, hora);
+      });
+    },100);
+  },200);
 }
 
 // ── LABORATORIOS ─────────────────────────────────────────────
