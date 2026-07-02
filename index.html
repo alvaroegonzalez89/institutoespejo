@@ -1316,15 +1316,47 @@ function actualizarSlots(){
   const grid    = document.getElementById('nSlots');
   document.getElementById('nHora').value='';
   document.querySelectorAll('.slot-btn').forEach(b=>b.classList.remove('sel'));
-  if(!profId||!fecha){grid.innerHTML='<div class="slot-none">Seleccioná profesional y fecha</div>';return;}
-  const slots=generarSlots(profId,fecha);
-  if(!slots.length){grid.innerHTML='<div class="slot-none">Sin horarios disponibles ese día</div>';return;}
-  grid.innerHTML=slots.map(s=>{
-    // Si es sobreturno, mostrar ocupados pero con estilo diferente (no deshabilitados)
+  if(!profId||!fecha){
+    grid.innerHTML='<div class="slot-none">Seleccioná profesional y fecha</div>';
+    return;
+  }
+
+  let slots = generarSlots(profId, fecha);
+  let modoUrgente = false;
+
+  if(!slots.length){
     if(esSobre){
-      return `<button class="slot-btn${!s.libre?' sobre-slot':''}" data-hora="${s.hora}" onclick="selSlot(this,'${s.hora}')" title="${!s.libre?'Ocupado — se agregará como sobreturno':''}">${s.hora}${!s.libre?' <span style="font-size:9px">ST</span>':''}</button>`;
+      // Prof no trabaja ese día + sobreturno → generar slots de urgencia
+      slots = generarSlotsUrgente(profId, fecha);
+      modoUrgente = true;
+    } else {
+      grid.innerHTML='<div class="slot-none" style="color:var(--ambar)">⚠️ El profesional no trabaja este día. Tildá "Sobreturno" para agregar un turno de urgencia.</div>';
+      return;
     }
-    return `<button class="slot-btn${!s.libre?' disabled':''}" data-hora="${s.hora}" onclick="${s.libre?`selSlot(this,'${s.hora}')`:'void(0)'}" ${!s.libre?'disabled':''}>${s.hora}</button>`;
+  }
+
+  if(modoUrgente){
+    grid.innerHTML = '<div style="font-size:11px;color:#B91C1C;padding:4px 0;grid-column:span 4">⚠️ Sobreturno de urgencia — elegí el horario:</div>' +
+      slots.map(s=>`<button class="slot-btn${!s.libre?' disabled':''}" data-hora="${s.hora}"
+        onclick="${s.libre?`selSlot(this,'${s.hora}')`:''}"
+        ${!s.libre?'disabled':''}
+        style="border-color:#E24B4A;color:${s.libre?'#B91C1C':'#ddd'}">${s.hora}</button>`
+      ).join('');
+    return;
+  }
+
+  grid.innerHTML = slots.map(s=>{
+    if(esSobre){
+      return `<button class="slot-btn${!s.libre?' sobre-slot':''}" data-hora="${s.hora}"
+        onclick="selSlot(this,'${s.hora}')"
+        title="${!s.libre?'Ocupado — se agregará como sobreturno':''}">
+        ${s.hora}${!s.libre?' <span style="font-size:9px">ST</span>':''}
+      </button>`;
+    }
+    return `<button class="slot-btn${!s.libre?' disabled':''}" data-hora="${s.hora}"
+      onclick="${s.libre?`selSlot(this,'${s.hora}')`:''}"
+      ${!s.libre?'disabled':''}>${s.hora}
+    </button>`;
   }).join('');
 }
 
@@ -2119,19 +2151,37 @@ async function guardarBloqueo(){
 function celdaClickUrgente(fecha, hora){
   if(!confirm(`¿Querés agregar un SOBRETURNO de urgencia el ${labelF(fecha)} a las ${hora} hs?
 (El profesional no trabaja ese día)`)) return;
-  abrirNuevoTurno(fecha, hora, profFiltro!=='todos'?profFiltro:null);
+  // Abrir modal con prof y fecha
+  abrirNuevoTurno(fecha, '', profFiltro!=='todos'?profFiltro:null);
   setTimeout(()=>{
-    // Tildar sobreturno ANTES de generar los slots
-    document.getElementById('nSobre').checked=true;
-    // Llamar actualizarSlots que ahora detecta esSobre=true y genera slots urgentes
+    // 1. Tildar sobreturno
+    document.getElementById('nSobre').checked = true;
+    // 2. Generar slots urgentes (prof no trabaja → modoUrgente)
     actualizarSlots();
-    // Pre-seleccionar el horario que se clickeó en la agenda
+    // 3. Pre-seleccionar la hora que se clickeó
     setTimeout(()=>{
-      document.querySelectorAll('#nSlots .slot-btn').forEach(b=>{
-        if(b.dataset.hora===hora && !b.disabled) selSlot(b, hora);
+      const btns = document.querySelectorAll('#nSlots .slot-btn');
+      let seleccionado = false;
+      btns.forEach(b=>{
+        if(b.dataset.hora === hora && !b.disabled){
+          selSlot(b, hora);
+          seleccionado = true;
+        }
       });
-    },100);
-  },200);
+      // Si la hora exacta no existe como slot (ej: 08:47), elegir el más cercano
+      if(!seleccionado && btns.length){
+        const hMins = hora.split(':').reduce((h,m,i)=>i===0?+m*60:h+ +m, 0);
+        let mejor = null, diff = 9999;
+        btns.forEach(b=>{
+          if(!b.disabled){
+            const bMins = b.dataset.hora.split(':').reduce((h,m,i)=>i===0?+m*60:h+ +m,0);
+            if(Math.abs(bMins-hMins)<diff){ diff=Math.abs(bMins-hMins); mejor=b; }
+          }
+        });
+        if(mejor) selSlot(mejor, mejor.dataset.hora);
+      }
+    }, 150);
+  }, 250);
 }
 
 // ── LABORATORIOS ─────────────────────────────────────────────
