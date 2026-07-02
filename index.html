@@ -839,6 +839,17 @@ function generarSlots(profId, fecha){
               .sort((a,b)=>a.hora.localeCompare(b.hora));
 }
 
+function generarSlotsUrgente(profId, fecha){
+  const slots=[];
+  let cur='08:00';
+  while(cur<='20:00'){
+    const ocup=turnos.filter(t=>t.profesionalId===profId&&t.fecha===fecha&&t.hora===cur&&t.estado!=='cancelado');
+    slots.push({hora:cur, libre:ocup.length===0, n:ocup.length});
+    cur=addMins(cur,30);
+  }
+  return slots;
+}
+
 // ── AUTH ─────────────────────────────────────────────────────
 // ── DETECCIÓN DE PÁGINA DE CONFIRMACIÓN PÚBLICA ──────────────
 const urlParams = new URLSearchParams(window.location.search);
