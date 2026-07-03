@@ -358,6 +358,9 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
           <button class="btn-s" onclick="abrirBloquearSlot()" title="Anular un horario puntual" style="color:#B91C1C;border-color:rgba(185,28,28,.3)">
             🚫 Anular horario
           </button>
+          <button class="btn-s" onclick="abrirTurnoUrgente()" title="Sobreturno de urgencia, cualquier día L-V" style="color:#B91C1C;border-color:rgba(185,28,28,.3)">
+            🚨 Turno urgencia
+          </button>
 
           <button class="btn-p" onclick="abrirNuevoTurno()">
             <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="white" stroke-width="2.2"><path d="M7 2v10M2 7h10"/></svg>
@@ -776,6 +779,7 @@ let profSelDoc   = null;
 let diaSelDoc    = hoyStr();
 let pacSelModal  = null;
 let turnoEditId  = null;
+let urgenteManual = false; // true cuando el sobreturno se forzó manualmente (celda tachada o botón "Turno urgencia")
 let profAusId    = null;
 let ausCalOff    = 0;
 let mcOffset     = 0;
@@ -840,12 +844,16 @@ function generarSlots(profId, fecha){
 }
 
 function generarSlotsUrgente(profId, fecha){
+  // Lunes a viernes, 9 a 21hs, cada 45 min — sin importar el horario habitual del profesional
+  const d = new Date(fecha+'T00:00:00');
+  const dow = d.getDay();
+  if(dow===0||dow===6) return []; // sin sobreturnos de urgencia los fines de semana
   const slots=[];
-  let cur='08:00';
-  while(cur<='20:00'){
+  let cur='09:00';
+  while(cur<='21:00'){
     const ocup=turnos.filter(t=>t.profesionalId===profId&&t.fecha===fecha&&t.hora===cur&&t.estado!=='cancelado');
     slots.push({hora:cur, libre:ocup.length===0, n:ocup.length});
-    cur=addMins(cur,30);
+    cur=addMins(cur,45);
   }
   return slots;
 }
@@ -1290,6 +1298,7 @@ function abrirNuevoTurno(fecha='', hora='', profId=null){
   ['nNom','nApe','nDni','nTel','nServ','nNota','nBus'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
   document.getElementById('nHora').value='';
   document.getElementById('nSobre').checked=false;
+  urgenteManual=false;
   document.getElementById('nTieneLab').checked=false;
   document.getElementById('labSelectWrap').classList.add('hidden');
   document.getElementById('nBusRes').style.display='none';
@@ -1335,11 +1344,24 @@ function actualizarSlots(){
   let slots = generarSlots(profId, fecha);
   let modoUrgente = false;
 
-  if(!slots.length){
+  if(esSobre && urgenteManual){
+    // Forzado manualmente (celda tachada o botón "Turno urgencia") → siempre rango de urgencia,
+    // sin importar si el profesional tiene alguna franja normal ese día.
+    slots = generarSlotsUrgente(profId, fecha);
+    modoUrgente = true;
+    if(!slots.length){
+      grid.innerHTML='<div class="slot-none" style="color:var(--ambar)">⚠️ No se pueden agregar sobreturnos de urgencia los fines de semana.</div>';
+      return;
+    }
+  } else if(!slots.length){
     if(esSobre){
       // Prof no trabaja ese día + sobreturno → generar slots de urgencia
       slots = generarSlotsUrgente(profId, fecha);
       modoUrgente = true;
+      if(!slots.length){
+        grid.innerHTML='<div class="slot-none" style="color:var(--ambar)">⚠️ No se pueden agregar sobreturnos de urgencia los fines de semana.</div>';
+        return;
+      }
     } else {
       grid.innerHTML='<div class="slot-none" style="color:var(--ambar)">⚠️ El profesional no trabaja este día. Tildá "Sobreturno" para agregar un turno de urgencia.</div>';
       return;
@@ -2158,6 +2180,16 @@ async function guardarBloqueo(){
   }
 }
 
+// ── BOTÓN "TURNO URGENCIA" (acceso directo, sin depender de la celda) ──
+function abrirTurnoUrgente(){
+  abrirNuevoTurno('', '', profFiltro!=='todos'?profFiltro:null);
+  setTimeout(()=>{
+    document.getElementById('nSobre').checked = true;
+    urgenteManual = true;
+    actualizarSlots();
+  }, 150);
+}
+
 // ── CELDA URGENTE (día no trabaja) ────────────────────────────
 function celdaClickUrgente(fecha, hora){
   if(!confirm(`¿Querés agregar un SOBRETURNO de urgencia el ${labelF(fecha)} a las ${hora} hs?
@@ -2167,7 +2199,8 @@ function celdaClickUrgente(fecha, hora){
   setTimeout(()=>{
     // 1. Tildar sobreturno
     document.getElementById('nSobre').checked = true;
-    // 2. Generar slots urgentes (prof no trabaja → modoUrgente)
+    // 2. Forzar rango de urgencia (L-V 9-21hs c/45min), sin importar si el prof tiene alguna franja normal ese día
+    urgenteManual = true;
     actualizarSlots();
     // 3. Pre-seleccionar la hora que se clickeó
     setTimeout(()=>{
