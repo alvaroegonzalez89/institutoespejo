@@ -148,6 +148,7 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
 .ag-table td.no-trabaja{background:repeating-linear-gradient(45deg,#f5f4f0,#f5f4f0 6px,#ebe9e3 6px,#ebe9e3 12px);cursor:not-allowed}
 .ag-table td.no-trabaja:hover{background:repeating-linear-gradient(45deg,#f5f4f0,#f5f4f0 6px,#ebe9e3 6px,#ebe9e3 12px)}
 .tblk{border-radius:5px;padding:3px 6px;font-size:11px;line-height:1.3;cursor:pointer;margin-bottom:2px;border-left:3px solid;transition:.1s;position:relative}
+.tblk-corr{height:100%;display:flex;flex-direction:column;justify-content:center}
 .tblk:hover{filter:brightness(.95);box-shadow:0 1px 4px rgba(0,0,0,.15)}
 .tblk.sobre{border-left-color:#E24B4A!important;background:#FFE4E4!important}
 .tblk.est-espera{background:var(--ambarp);border-left-color:var(--ambar)}
@@ -532,6 +533,9 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
       </label>
     </div>
     <div class="modal-footer">
+      <button class="btn-s" style="color:#B91C1C;border-color:rgba(185,28,28,.3);margin-right:auto" onclick="anularDesdeNuevoTurno()" title="Anular este horario y dejarlo bloqueado">
+        🚫 Anular horario
+      </button>
       <button class="btn-s" onclick="cerrarModal('mNuevo')">Cancelar</button>
       <button class="btn-p" onclick="guardarTurno()">Guardar turno</button>
     </div>
@@ -1077,12 +1081,19 @@ function renderAgenda(){
 
   // BODY
   let tbody = '<tbody>';
-  horas.forEach(hora=>{
+  const skipCol = [0,0,0,0,0,0]; // filas restantes a saltear por columna (por rowspan de correlativos)
+
+  const getTs = (fs,hora) => turnos.filter(t=>t.fecha===fs&&t.hora===hora&&t.estado!=='cancelado'&&(profFiltro==='todos'||t.profesionalId===profFiltro));
+
+  horas.forEach((hora,rIdx)=>{
     tbody += `<tr><td>${hora}</td>`;
     for(let i=0;i<6;i++){
       const d=new Date(lunes); d.setDate(lunes.getDate()+i);
       const fs=fStr(d); const esH=fs===HOY;
-      const ts=turnos.filter(t=>t.fecha===fs&&t.hora===hora&&t.estado!=='cancelado'&&(profFiltro==='todos'||t.profesionalId===profFiltro));
+
+      if(skipCol[i]>0){ skipCol[i]--; continue; } // esta celda ya está cubierta por el rowspan de arriba
+
+      const ts=getTs(fs,hora);
 
       // Determinar si la celda es "no trabaja" (tachada) - solo aplica si hay 1 prof filtrado
       let noTrabaja = false;
@@ -1097,6 +1108,19 @@ function renderAgenda(){
         }
       }
 
+      // ── Detectar turno correlativo: fusionar en una sola celda (rowspan) ──
+      let rowspan = 1;
+      if(ts.length===1 && ts[0].grupoCorrelativo){
+        const grp = ts[0].grupoCorrelativo, prof = ts[0].profesionalId;
+        for(let look=rIdx+1; look<horas.length; look++){
+          const tsN = getTs(fs, horas[look]);
+          if(tsN.length===1 && tsN[0].grupoCorrelativo===grp && tsN[0].profesionalId===prof){
+            rowspan++;
+          } else break;
+        }
+        if(rowspan>1) skipCol[i]=rowspan-1;
+      }
+
       const bloques=ts.map(t=>{
         const p=gProf(t.profesionalId);
         const estado = t.estado || 'espera';
@@ -1104,11 +1128,12 @@ function renderAgenda(){
         const estLabel = {espera:'',dado:'',presente:'P',asa:'ASA',aca:'ACA'}[estado] || '';
         const labIco = t.labNombre ? `<span class="tblk-ico" title="Laboratorio: ${t.labNombre}">🧪</span>` : '';
         const notaIco = t.nota ? `<span class="tblk-ico" title="${t.nota.replace(/"/g,'&quot;')}">📝</span>` : '';
-        return `<div class="tblk ${estClass}" onclick="verDetalle('${t.id}')">
+        const corrIco = (t.grupoCorrelativo&&rowspan>1) ? `<span class="tblk-ico" title="Turno correlativo (${rowspan} horarios)">🔗</span>` : '';
+        return `<div class="tblk ${estClass}${rowspan>1?' tblk-corr':''}" onclick="verDetalle('${t.id}')">
           <div class="tn">${t.pacNombre?t.pacNombre.split(' ')[0]:'—'}
             ${t.esSobreturno?' <small style="background:#E24B4A;color:white;border-radius:2px;padding:0 3px">ST</small>':''}
             ${estLabel?` <small style="background:rgba(0,0,0,.12);border-radius:2px;padding:0 3px;font-size:9px">${estLabel}</small>`:''}
-            <span class="tblk-icos">${labIco}${notaIco}</span>
+            <span class="tblk-icos">${labIco}${notaIco}${corrIco}</span>
           </div>
           <div class="ti">${p?(p.ape+(p.nom?' '+p.nom.split(' ')[0]:'')):'—'}</div>
         </div>`;
@@ -1125,16 +1150,18 @@ function renderAgenda(){
         cellContent = `<div class="blk-lbl">🚫 ${bloqueo.nota||'Bloqueado'}</div>`;
       }
 
-      // noTrabaja pero clickeable para sobreturno de urgencia
+      // noTrabaja pero clickeable para sobreturno de urgencia / bloqueado clickeable para reactivar
       let cellClick = '';
-      if(!esBloqueado){
-        if(noTrabaja){
-          cellClick = `onclick="celdaClickUrgente('${fs}','${hora}')"`;
-        } else {
-          cellClick = `onclick="celdaClick('${fs}','${hora}')"`;
-        }
+      if(esBloqueado){
+        cellClick = `onclick="celdaClickBloqueado('${bloqueo.id}')"`;
+      } else if(noTrabaja){
+        cellClick = `onclick="celdaClickUrgente('${fs}','${hora}')"`;
+      } else {
+        cellClick = `onclick="celdaClick('${fs}','${hora}')"`;
       }
-      tbody+=`<td class="${cellClass}" ${cellClick} title="${noTrabaja&&!esBloqueado?'Clic para sobreturno de urgencia':''}">${cellContent}</td>`;
+      const rowspanAttr = rowspan>1 ? ` rowspan="${rowspan}"` : '';
+      const titleAttr = esBloqueado?'Clic para reactivar este horario':(noTrabaja?'Clic para sobreturno de urgencia':'');
+      tbody+=`<td class="${cellClass}"${rowspanAttr} ${cellClick} title="${titleAttr}">${cellContent}</td>`;
     }
     tbody += '</tr>';
   });
@@ -2087,6 +2114,15 @@ function toggleCorrSlot(hora, libre){
 }
 
 // ── BLOQUEAR SLOT ─────────────────────────────────────────────
+// ── ANULAR HORARIO DESDE EL MODAL "NUEVO TURNO" ────────────────
+function anularDesdeNuevoTurno(){
+  const profId = document.getElementById('nProf').value;
+  const fecha  = document.getElementById('nFecha').value;
+  const hora   = document.getElementById('nHora').value;
+  cerrarModal('mNuevo');
+  abrirBloquearSlot(fecha, hora, profId);
+}
+
 function abrirBloquearSlot(fecha='', hora='', profId=''){
   const sel = document.getElementById('blkProf');
   sel.innerHTML = profs.map(p=>`<option value="${p.id}">${p.ape}${p.nom?', '+p.nom:''}</option>`).join('');
@@ -2188,6 +2224,22 @@ function abrirTurnoUrgente(){
     urgenteManual = true;
     actualizarSlots();
   }, 150);
+}
+
+// ── REACTIVAR HORARIO BLOQUEADO ────────────────────────────────
+async function celdaClickBloqueado(bloqueoId){
+  const b = turnos.find(t=>t.id===bloqueoId); if(!b) return;
+  const p = gProf(b.profesionalId);
+  if(!confirm(`Este horario está anulado (${b.nota||'Bloqueado'}).\n\n¿Querés reactivarlo y dejarlo disponible de nuevo?\n${labelF(b.fecha)} a las ${b.hora} hs · ${p?p.ape:''}`)) return;
+  try {
+    await db.collection('turnos').doc(bloqueoId).update({
+      estado: 'cancelado',
+      reactivadoEn: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    toast('Horario reactivado ✓','ok');
+  } catch(e){
+    toast('Error: '+e.message,'err');
+  }
 }
 
 // ── CELDA URGENTE (día no trabaja) ────────────────────────────
