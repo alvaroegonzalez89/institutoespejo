@@ -729,6 +729,19 @@ firebase.initializeApp(firebaseConfig);
 const db   = firebase.firestore();
 const auth = firebase.auth();
 
+// Caché local persistente (IndexedDB): al recargar la página, Firestore muestra
+// primero lo que ya tiene guardado en el navegador (instantáneo) y después
+// sincroniza en segundo plano. synchronizeTabs permite que funcione bien aunque
+// la secretaría tenga varias pestañas/computadoras abiertas con el sistema.
+db.enablePersistence({synchronizeTabs:true}).catch(err=>{
+  if(err.code==='failed-precondition'){
+    console.warn('Caché offline no disponible: hay otra pestaña con una versión más vieja abierta.');
+  } else if(err.code==='unimplemented'){
+    console.warn('Este navegador no soporta caché offline de Firestore.');
+  }
+  // No es un error crítico: el sistema sigue funcionando igual, solo sin el beneficio de la caché.
+});
+
 // ══════════════════════════════════════════════════════════════
 //  DATOS PROFESIONALES
 // ══════════════════════════════════════════════════════════════
@@ -769,6 +782,12 @@ const MESES  = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto
 const MESES_M= ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const TEL    = '2604396462';
 let LABORATORIOS = ['Naspi','Yebra','Paula','Natalia','Mauricio'];
+
+// Ventana de fechas que se mantiene sincronizada en vivo (evita traer TODA la
+// colección de turnos para siempre). La ficha de paciente consulta historial
+// completo por separado, así que esto no le afecta.
+const VENTANA_DIAS_ATRAS    = 120; // ~4 meses hacia atrás
+const VENTANA_DIAS_ADELANTE = 180; // ~6 meses hacia adelante
 
 // Estado
 let profs     = JSON.parse(JSON.stringify(PROFS_INIT));
@@ -971,8 +990,17 @@ function doLogout(){ if(unsubTurnos)unsubTurnos(); if(unsubPacs)unsubPacs(); aut
 
 // ── LISTENERS FIRESTORE ───────────────────────────────────────
 function iniciarListeners(){
-  // Sin orderBy para evitar requerir índices compuestos en Firestore
+  // Ventana de fechas: rango con dos filtros sobre el MISMO campo ('fecha'),
+  // lo cual NO requiere índice compuesto en Firestore (a diferencia de
+  // combinar where + orderBy en campos distintos, que sí lo pedía antes).
+  const hoy = new Date();
+  const desde = new Date(hoy); desde.setDate(desde.getDate()-VENTANA_DIAS_ATRAS);
+  const hasta = new Date(hoy); hasta.setDate(hasta.getDate()+VENTANA_DIAS_ADELANTE);
+  const desdeStr = fStr(desde), hastaStr = fStr(hasta);
+
   unsubTurnos = db.collection('turnos')
+    .where('fecha','>=',desdeStr)
+    .where('fecha','<=',hastaStr)
     .onSnapshot(snap=>{
       turnos = snap.docs.map(d=>({...d.data(), id:d.id}));
       // ordenar en cliente
@@ -1479,11 +1507,23 @@ async function guardarTurno(){
       if(col){toast('Ese horario ya está ocupado. Marcá sobreturno si querés agregarlo igual.','err');return;}
     }
 
-    // Buscar o crear paciente
+    // Buscar o crear paciente — evitar duplicados cuando no se cargó DNI
     let pacId = pacSelModal || null;
     if(!pacId){
+      const telNorm = tel.replace(/\D/g,''); // solo dígitos, para comparar sin importar formato
       if(dni){
         const exist = pacientes.find(p=>p.dni&&p.dni===dni);
+        if(exist) pacId = exist.id;
+      }
+      if(!pacId && telNorm){
+        const exist = pacientes.find(p=>p.telefono && p.telefono.replace(/\D/g,'')===telNorm);
+        if(exist) pacId = exist.id;
+      }
+      if(!pacId && nom && ape){
+        const exist = pacientes.find(p=>
+          (p.nom||'').trim().toLowerCase()===nom.toLowerCase() &&
+          (p.ape||'').trim().toLowerCase()===ape.toLowerCase()
+        );
         if(exist) pacId = exist.id;
       }
       if(!pacId){
@@ -1930,11 +1970,24 @@ function buscarPacientes(q){
   </div>`).join(''):'<div class="bus-item" style="color:var(--gm)">Sin resultados</div>';
 }
 
-function verFicha(pacId){
+async function verFicha(pacId){
   const p=pacientes.find(x=>x.id===pacId); if(!p) return;
   const ini=((p.ape||'').charAt(0)+(p.nom||'').charAt(0)).toUpperCase();
-  const hist=turnos.filter(t=>t.pacienteId===pacId).sort((a,b)=>b.fecha.localeCompare(a.fecha));
   document.getElementById('fichaTit').textContent=`${p.ape||''}, ${p.nom||''}`;
+  document.getElementById('fichaBody').innerHTML='<div class="empty">Cargando historial…</div>';
+  abrirModal('mFicha');
+
+  // Historial COMPLETO del paciente: consulta directa a Firestore (no depende
+  // de la ventana de fechas del listener en vivo), así nunca se pierden visitas viejas.
+  let hist = [];
+  try{
+    const snap = await db.collection('turnos').where('pacienteId','==',pacId).get();
+    hist = snap.docs.map(d=>({...d.data(), id:d.id})).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  }catch(e){
+    console.error('Error cargando historial:', e);
+    toast('No se pudo cargar el historial completo: '+e.message,'err');
+  }
+
   document.getElementById('fichaBody').innerHTML=`
     <div style="display:flex;align-items:center;gap:13px;margin-bottom:1rem;padding-bottom:1rem;border-bottom:1px solid var(--bor)">
       <div style="width:48px;height:48px;border-radius:50%;background:var(--azulp);color:var(--azul);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:500">${ini}</div>
@@ -1979,7 +2032,6 @@ function verFicha(pacId){
     <button class="btn-p" onclick="guardarNotaGeneral('${pacId}')">💾 Guardar nota</button>
     <button class="btn-p" onclick="cerrarModal('mFicha');abrirNuevoTurno('','',null)">+ Nuevo turno</button>
   `;
-  abrirModal('mFicha');
 }
 
 function agregarNotaTurno(turnoId, pacId){
