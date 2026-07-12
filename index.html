@@ -637,6 +637,7 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
       <div class="fg"><label class="flbl">Antecedentes / Alergias</label><textarea class="finput" id="npAnte" style="min-height:65px;resize:vertical"></textarea></div>
     </div>
     <div class="modal-footer">
+      <button class="btn-s" id="npBtnBorrar" style="color:#B91C1C;border-color:rgba(185,28,28,.3);margin-right:auto;display:none" onclick="borrarPaciente()">🗑️ Borrar paciente</button>
       <button class="btn-s" onclick="cerrarModal('mNuevoPac')">Cancelar</button>
       <button class="btn-p" onclick="guardarPaciente()">Guardar</button>
     </div>
@@ -968,9 +969,13 @@ function mostrarLogin(){
   document.getElementById('pgLogin').style.display='flex';
   document.getElementById('pgApp').style.display='none';
 }
-function mostrarApp(){
+async function mostrarApp(){
   document.getElementById('pgLogin').style.display='none';
   document.getElementById('pgApp').style.display='flex';
+  // Forzar renovación del token de sesión antes de pedir datos, para evitar
+  // el error transitorio "Missing or insufficient permissions" que puede
+  // aparecer si el primer pedido sale con una credencial todavía no del todo lista.
+  try{ if(auth.currentUser) await auth.currentUser.getIdToken(true); }catch(e){}
   iniciarListeners();
   renderSidebar();
   renderMiniCal();
@@ -1013,6 +1018,12 @@ function iniciarListeners(){
       if(profSelDoc) renderVistaMedico();
     }, err=>{
       console.error('onSnapshot turnos error:', err);
+      if(err.code==='permission-denied' && !window._reintentoTurnos){
+        // Reintento silencioso una sola vez (posible token todavía no listo)
+        window._reintentoTurnos = true;
+        setTimeout(()=>iniciarListeners(), 1200);
+        return;
+      }
       toast('Error de conexión: '+err.message, 'err');
     });
 
@@ -1023,6 +1034,7 @@ function iniciarListeners(){
       renderPacientes();
     }, err=>{
       console.error('onSnapshot pacientes error:', err);
+      toast('Error cargando pacientes: '+err.message, 'err');
     });
 }
 
@@ -2055,6 +2067,7 @@ function abrirNuevoPaciente(){
   document.getElementById('npTit').textContent='Nuevo paciente';
   ['npNom','npApe','npDni','npTel','npEmail','npOs','npAnte'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
   document.getElementById('npFecNac').value='';
+  document.getElementById('npBtnBorrar').style.display='none';
   abrirModal('mNuevoPac');
 }
 
@@ -2070,8 +2083,30 @@ function abrirEditPaciente(pacId){
   document.getElementById('npFecNac').value=p.fechaNac||'';
   document.getElementById('npOs').value=p.obraSocial||'';
   document.getElementById('npAnte').value=p.antecedentes||'';
+  document.getElementById('npBtnBorrar').style.display='';
   cerrarModal('mFicha');
   abrirModal('mNuevoPac');
+}
+
+async function borrarPaciente(){
+  const id = document.getElementById('npId').value;
+  if(!id) return;
+  const p = pacientes.find(x=>x.id===id);
+  const cantTurnos = turnos.filter(t=>t.pacienteId===id).length;
+
+  const msg = cantTurnos>0
+    ? `¿Borrar a ${p?.ape||''}, ${p?.nom||''} definitivamente?\n\nTiene ${cantTurnos} turno(s) cargado(s). Los turnos NO se van a borrar (van a seguir viéndose en la agenda con su nombre), pero dejarán de estar vinculados a una ficha de paciente.\n\nEsta acción no se puede deshacer.`
+    : `¿Borrar a ${p?.ape||''}, ${p?.nom||''} definitivamente?\n\nEsta acción no se puede deshacer.`;
+
+  if(!confirm(msg)) return;
+
+  try{
+    await db.collection('pacientes').doc(id).delete();
+    toast('Paciente borrado ✓','ok');
+    cerrarModal('mNuevoPac');
+  }catch(e){
+    toast('Error al borrar: '+e.message,'err');
+  }
 }
 
 async function guardarPaciente(){
