@@ -1170,7 +1170,7 @@ function renderAgenda(){
         const notaIco = t.nota ? `<span class="tblk-ico" title="${t.nota.replace(/"/g,'&quot;')}">📝</span>` : '';
         const corrIco = (t.grupoCorrelativo&&rowspan>1) ? `<span class="tblk-ico" title="Turno correlativo (${rowspan} horarios)">🔗</span>` : '';
         return `<div class="tblk ${estClass}${rowspan>1?' tblk-corr':''}" onclick="verDetalle('${t.id}')">
-          <div class="tn">${t.pacNombre?t.pacNombre.split(' ')[0]:'—'}
+          <div class="tn">${t.pacNombre?t.pacNombre:'—'}
             ${t.esSobreturno?' <small style="background:#E24B4A;color:white;border-radius:2px;padding:0 3px">ST</small>':''}
             ${estLabel?` <small style="background:rgba(0,0,0,.12);border-radius:2px;padding:0 3px;font-size:9px">${estLabel}</small>`:''}
             <span class="tblk-icos">${labIco}${notaIco}${corrIco}</span>
