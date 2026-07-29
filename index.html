@@ -1696,9 +1696,10 @@ async function guardarDetalle(id){
   cerrarModal('mDet');
 }
 
-async function cambiarEstadoTurno(id, estado){
+async function cambiarEstadoTurno(id, estado, idsGrupo){
+  const ids = idsGrupo ? JSON.parse(idsGrupo) : [id];
   try {
-    await db.collection('turnos').doc(id).update({estado});
+    await Promise.all(ids.map(i=>db.collection('turnos').doc(i).update({estado})));
     toast('Estado actualizado: '+({espera:'En espera',dado:'Dado',presente:'Presente',asa:'Ausente sin aviso',aca:'Ausente con aviso'}[estado]),'ok');
     verDetalle(id); // re-render para reflejar el cambio visualmente
   } catch(e){
@@ -1783,24 +1784,46 @@ function renderVistaMedico(){
       cancelado:`<span class="badge-asa">Cancelado</span>`,
       bloqueado:`<span class="badge-asa">🚫 Bloqueado</span>`
     };
-    tEl.innerHTML=ts.map(t=>`
+
+    // Agrupar turnos correlativos consecutivos (mismo grupoCorrelativo) en un solo bloque
+    const grupos = [];
+    for(let i=0;i<ts.length;i++){
+      const t = ts[i];
+      if(t.grupoCorrelativo && grupos.length){
+        const ultimo = grupos[grupos.length-1];
+        const ultimoT = ultimo[ultimo.length-1];
+        if(ultimoT.grupoCorrelativo===t.grupoCorrelativo){
+          ultimo.push(t);
+          continue;
+        }
+      }
+      grupos.push([t]);
+    }
+
+    tEl.innerHTML=grupos.map(grupo=>{
+      const t = grupo[0];
+      const esCorrido = grupo.length>1;
+      const horaFin = addMins(grupo[grupo.length-1].hora, p.dur||30);
+      const horaLabel = esCorrido ? `${t.hora}–${horaFin}` : t.hora;
+      const idsGrupoAttr = esCorrido ? `'${JSON.stringify(grupo.map(g=>g.id)).replace(/"/g,'&quot;')}'` : 'null';
+      return `
       <div class="vivo-row${t.esSobreturno?' sobre':''}" onclick="verDetalle('${t.id}')">
-        <div class="vivo-hora" style="color:${p.color}">${t.hora}</div>
+        <div class="vivo-hora" style="color:${p.color}">${horaLabel}</div>
         <div style="flex:1">
-          <div class="vivo-nom">${t.pacNombre||'—'} ${t.esSobreturno?'<small style="background:#E24B4A;color:white;border-radius:3px;padding:0 4px;font-size:9px">ST</small>':''} ${t.labNombre?`<span title="Lab: ${t.labNombre}" style="font-size:12px">🧪</span>`:''}</div>
+          <div class="vivo-nom">${t.pacNombre||'—'} ${esCorrido?`<span class="tblk-ico" title="Turno correlativo (${grupo.length} horarios)">🔗</span>`:''} ${t.esSobreturno?'<small style="background:#E24B4A;color:white;border-radius:3px;padding:0 4px;font-size:9px">ST</small>':''} ${t.labNombre?`<span title="Lab: ${t.labNombre}" style="font-size:12px">🧪</span>`:''}</div>
           <div class="vivo-det">${t.servicio||'—'} · 📱 ${t.pacTel||'—'}</div>
           ${t.nota?`<div style="font-size:11px;color:var(--ambar);margin-top:2px;font-style:italic">⚠️ ${t.nota}</div>`:''}
         </div>
         <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
           ${badgeMap[t.estado||'dado']||''}
           ${esHoyDoc?`<div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end">
-            <button class="btn-s" style="font-size:10px;padding:3px 7px;background:${t.estado==='espera'?'var(--ambarp)':''}" onclick="event.stopPropagation();cambiarEstadoTurno('${t.id}','espera')">Sala espera</button>
-            <button class="btn-s" style="font-size:10px;padding:3px 7px;background:${t.estado==='presente'?'var(--verdep)':''}" onclick="event.stopPropagation();cambiarEstadoTurno('${t.id}','presente')">Presente</button>
-            <button class="btn-s" style="font-size:10px;padding:3px 7px;color:var(--rojo)" onclick="event.stopPropagation();cambiarEstadoTurno('${t.id}','asa')">ASA</button>
+            <button class="btn-s" style="font-size:10px;padding:3px 7px;background:${t.estado==='espera'?'var(--ambarp)':''}" onclick="event.stopPropagation();cambiarEstadoTurno('${t.id}','espera',${idsGrupoAttr})">Sala espera</button>
+            <button class="btn-s" style="font-size:10px;padding:3px 7px;background:${t.estado==='presente'?'var(--verdep)':''}" onclick="event.stopPropagation();cambiarEstadoTurno('${t.id}','presente',${idsGrupoAttr})">Presente</button>
+            <button class="btn-s" style="font-size:10px;padding:3px 7px;color:var(--rojo)" onclick="event.stopPropagation();cambiarEstadoTurno('${t.id}','asa',${idsGrupoAttr})">ASA</button>
           </div>`:''}
         </div>
       </div>
-    `).join('');
+    `;}).join('');
   }
   // Slots disponibilidad
   const slots=generarSlots(profSelDoc,diaSelDoc);
