@@ -120,6 +120,10 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
 .mc-d.tiene-espera{background:var(--ambarp);color:#854F0B;font-weight:500}
 .mc-d.aus-prof{background:var(--rojop)!important;color:var(--rojo)!important;cursor:not-allowed;text-decoration:line-through}
 .mc-d.no-atiende{color:var(--bor)!important;cursor:not-allowed;background:var(--gc)!important;opacity:.6}
+.mc-d.feriado{background:#B91C1C!important;color:white!important;font-weight:600;text-decoration:line-through}
+.mc-d.semana-sel{border-color:var(--azul)!important;box-shadow:inset 0 0 0 1px var(--azul)}
+.mc-d.semana-sel.hoy{box-shadow:0 0 0 2px var(--azul)}
+#btnModoFeriados.activo{background:#B91C1C;color:white;border-color:#B91C1C}
 .stat-sm{background:var(--gc);border-radius:var(--r);padding:.65rem .85rem;margin-bottom:.5rem}
 .stat-sm-v{font-size:20px;font-weight:600;color:var(--azul);line-height:1}
 .stat-sm-l{font-size:11px;color:var(--gm);margin-top:2px}
@@ -390,6 +394,9 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
         <button class="toggle-sb" onclick="toggleSidebar('der')" id="btnToggleDer" title="Ocultar/mostrar calendario">›</button>
         <aside class="sb-der" id="sbDer" style="flex:1">
         <div class="sbd-tit">Calendario</div>
+        <button class="btn-s" id="btnModoFeriados" onclick="toggleModoFeriados()" style="width:100%;margin-bottom:.5rem;font-size:11.5px;color:#B91C1C;border-color:rgba(185,28,28,.3)" title="Activar para tocar un día del calendario y marcarlo/desmarcarlo como feriado">
+          📌 Marcar feriados
+        </button>
         <div class="mc-wrap">
           <div class="mc-nav">
             <button class="mc-btn" onclick="mcNav(-1)">‹</button>
@@ -407,6 +414,16 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
             <button class="mc-btn" onclick="mcNav2(1)">›</button>
           </div>
           <div class="mc-grid" id="mcGrid2"></div>
+        </div>
+        <!-- Tercer mes calendario -->
+        <div class="sbd-tit" style="margin-top:.75rem">Mes siguiente</div>
+        <div class="mc-wrap">
+          <div class="mc-nav">
+            <button class="mc-btn" onclick="mcNav3(-1)">‹</button>
+            <span style="font-size:12px;font-weight:500" id="mcTit3"></span>
+            <button class="mc-btn" onclick="mcNav3(1)">›</button>
+          </div>
+          <div class="mc-grid" id="mcGrid3"></div>
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;margin:.75rem 0 .5rem">
           <div class="sbd-tit" style="margin:0">Recordatorios</div>
@@ -796,6 +813,8 @@ let turnos    = [];
 let pacientes = [];
 let ausencias = {};
 profs.forEach(p => ausencias[p.id] = new Set());
+let feriados = new Set(); // fechas YYYY-MM-DD marcadas como no laborables para toda la clínica
+let modoMarcarFeriados = false;
 
 let profFiltro   = 'todos';
 let offSemana    = 0;
@@ -810,6 +829,7 @@ let mcOffset     = 0;
 let unsubTurnos  = null;
 let unsubPacs    = null;
 let unsubProfsCfg = null;
+let unsubFeriados = null;
 
 // ── HELPERS ──────────────────────────────────────────────────
 function hoyStr() {
@@ -840,6 +860,7 @@ function tieneAus(profId, fecha){
 function generarSlots(profId, fecha){
   const p=gProf(profId); if(!p) return [];
   if(tieneAus(profId,fecha)) return [];
+  if(feriados.has(fecha)) return [];
   const d=new Date(fecha+'T00:00:00');
   const dow=d.getDay();
   const franjas=p.hs.filter(h=>h.d===dow);
@@ -992,7 +1013,7 @@ function doLogin(){
   auth.signInWithEmailAndPassword('clinica@espejo.com','espejo2026')
     .catch(e=>{ err.textContent='Error: '+e.message; });
 }
-function doLogout(){ if(unsubTurnos)unsubTurnos(); if(unsubPacs)unsubPacs(); auth.signOut(); }
+function doLogout(){ if(unsubTurnos)unsubTurnos(); if(unsubPacs)unsubPacs(); if(unsubProfsCfg)unsubProfsCfg(); if(unsubFeriados)unsubFeriados(); auth.signOut(); }
 
 // ── LISTENERS FIRESTORE ───────────────────────────────────────
 function iniciarListeners(){
@@ -1059,6 +1080,16 @@ function iniciarListeners(){
     }, err=>{
       console.error('onSnapshot profsConfig error:', err);
       toast('Error cargando configuración de profesionales: '+err.message, 'err');
+    });
+
+  // Feriados / días no laborables de toda la clínica
+  unsubFeriados = db.collection('feriados')
+    .onSnapshot(snap=>{
+      feriados = new Set(snap.docs.map(d=>d.id));
+      renderAgenda(); renderMiniCal();
+    }, err=>{
+      console.error('onSnapshot feriados error:', err);
+      toast('Error cargando feriados: '+err.message, 'err');
     });
 }
 
@@ -1138,8 +1169,9 @@ function renderAgenda(){
     const fs=fStr(d); const esH=fs===HOY;
     const cnt=turnos.filter(t=>t.fecha===fs&&t.estado!=='cancelado'&&(profFiltro==='todos'||t.profesionalId===profFiltro)).length;
     const fechaCompleta = `${DIAS_FULL[d.getDay()]} ${String(d.getDate()).padStart(2,'0')} de ${MESES[d.getMonth()]} de ${d.getFullYear()}`;
-    thead+=`<th class="${esH?'hoy':''}" title="${fechaCompleta}">
-      <div class="ag-dnom">${DIAS_FULL[d.getDay()]}</div>
+    const esFer = feriados.has(fs);
+    thead+=`<th class="${esH?'hoy':''}" title="${esFer?'Feriado — '+fechaCompleta:fechaCompleta}">
+      ${esFer?'<div style="font-size:9px;color:#B91C1C;font-weight:700">🎉 FERIADO</div>':''}      <div class="ag-dnom">${DIAS_FULL[d.getDay()]}</div>
       ${esH?`<div class="ag-dnum hoy-n">${d.getDate()}</div>`:`<div class="ag-dnum">${d.getDate()}</div>`}
       <div style="font-size:9.5px;color:var(--gm);white-space:nowrap">de ${MESES[d.getMonth()]} de ${d.getFullYear()}</div>
       ${cnt?`<div style="font-size:10px;color:var(--gm)">${cnt}t</div>`:''}
@@ -1165,7 +1197,10 @@ function renderAgenda(){
 
       // Determinar si la celda es "no trabaja" (tachada) - solo aplica si hay 1 prof filtrado
       let noTrabaja = false;
-      if(profFiltro!=='todos'){
+      const esFeriadoDia = feriados.has(fs);
+      if(esFeriadoDia){
+        noTrabaja = true;
+      } else if(profFiltro!=='todos'){
         const p = gProf(profFiltro);
         if(p && !tieneAus(profFiltro,fs)){
           const dow = d.getDay();
@@ -1310,8 +1345,19 @@ function enviarTodosWA(){
 
 // ── MINI CALENDARIO ───────────────────────────────────────────
 let mcOffset2 = 1; // segundo mes arranca en el mes siguiente
+let mcOffset3 = 2; // tercer mes arranca dos meses adelante
 function mcNav(d){ mcOffset+=d; renderMiniCal(); }
 function mcNav2(d){ mcOffset2+=d; renderMiniCal2(); }
+function mcNav3(d){ mcOffset3+=d; renderMiniCal3(); }
+
+// Devuelve true si `fs` (YYYY-MM-DD) cae dentro de la semana actualmente
+// mostrada en la agenda (lunes a sábado), para resaltarla en los mini-calendarios.
+function esSemanaSeleccionada(fs){
+  const lunes = getLunes(offSemana);
+  const sab = new Date(lunes); sab.setDate(lunes.getDate()+5);
+  return fs >= fStr(lunes) && fs <= fStr(sab);
+}
+
 function renderMiniCal2(){
   const hoy=new Date();
   const mes=new Date(hoy.getFullYear(),hoy.getMonth()+mcOffset2,1);
@@ -1327,9 +1373,36 @@ function renderMiniCal2(){
     const fs=`${mes.getFullYear()}-${S(mes.getMonth()+1)}-${S(d)}`;
     const esH=fs===HOY; const tieneT=diasConT.has(fs);
     const esFinde=dow===0||dow===6;
-    html+=`<div class="mc-d${esH?' hoy':''}${tieneT&&!esH?' tiene':''}${esFinde?' finde':''}" onclick="${!esFinde?`irAFecha('${fs}')`:''}">${d}</div>`;
+    const esFer=feriados.has(fs);
+    const esSemSel=esSemanaSeleccionada(fs);
+    const clickeable = modoMarcarFeriados ? !esFinde : (!esFinde&&!esFer);
+    const onclick = modoMarcarFeriados ? `toggleFeriado('${fs}')` : (clickeable?`irAFecha('${fs}')`:'');
+    html+=`<div class="mc-d${esH?' hoy':''}${tieneT&&!esH&&!esFer?' tiene':''}${esFinde?' finde':''}${esFer?' feriado':''}${esSemSel?' semana-sel':''}" onclick="${onclick}" title="${esFer?'Feriado':''}">${d}</div>`;
   }
   const el=document.getElementById('mcGrid2'); if(el) el.innerHTML=html;
+}
+function renderMiniCal3(){
+  const hoy=new Date();
+  const mes=new Date(hoy.getFullYear(),hoy.getMonth()+mcOffset3,1);
+  const ultD=new Date(mes.getFullYear(),mes.getMonth()+1,0).getDate();
+  const primerDow=(mes.getDay()+6)%7;
+  const HOY=hoyStr();
+  const diasConT=new Set(turnos.map(t=>t.fecha));
+  const tit=document.getElementById('mcTit3'); if(tit) tit.textContent=`${MESES_M[mes.getMonth()]} ${mes.getFullYear()}`;
+  let html=['Lu','Ma','Mi','Ju','Vi','Sá','Do'].map(d=>`<div class="mc-dh">${d}</div>`).join('');
+  for(let i=0;i<primerDow;i++) html+='<div></div>';
+  for(let d=1;d<=ultD;d++){
+    const dow=new Date(mes.getFullYear(),mes.getMonth(),d).getDay();
+    const fs=`${mes.getFullYear()}-${S(mes.getMonth()+1)}-${S(d)}`;
+    const esH=fs===HOY; const tieneT=diasConT.has(fs);
+    const esFinde=dow===0||dow===6;
+    const esFer=feriados.has(fs);
+    const esSemSel=esSemanaSeleccionada(fs);
+    const clickeable = modoMarcarFeriados ? !esFinde : (!esFinde&&!esFer);
+    const onclick = modoMarcarFeriados ? `toggleFeriado('${fs}')` : (clickeable?`irAFecha('${fs}')`:'');
+    html+=`<div class="mc-d${esH?' hoy':''}${tieneT&&!esH&&!esFer?' tiene':''}${esFinde?' finde':''}${esFer?' feriado':''}${esSemSel?' semana-sel':''}" onclick="${onclick}">${d}</div>`;
+  }
+  const el=document.getElementById('mcGrid3'); if(el) el.innerHTML=html;
 }
 function renderMiniCal(){
   const hoy=new Date();
@@ -1374,10 +1447,18 @@ function renderMiniCal(){
       }
     }
 
-    html+=`<div class="mc-d${esH?' hoy':''}${esFinde?' finde':''}${claseExtra}" onclick="${clickeable?`irAFecha('${fs}')`:''}" title="${profEsp&&tieneAus(profFiltro,fs)?'Profesional ausente':''}">${d}</div>`;
+    const esFer = feriados.has(fs);
+    if(esFer){ claseExtra=' feriado'; clickeable=false; }
+    const esSemSel = esSemanaSeleccionada(fs);
+    if(esSemSel) claseExtra+=' semana-sel';
+
+    const onclick = modoMarcarFeriados ? (!esFinde?`toggleFeriado('${fs}')`:'') : (clickeable?`irAFecha('${fs}')`:'');
+    const tit = esFer ? 'Feriado' : (profEsp&&tieneAus(profFiltro,fs)?'Profesional ausente':'');
+    html+=`<div class="mc-d${esH?' hoy':''}${esFinde?' finde':''}${claseExtra}" onclick="${onclick}" title="${tit}">${d}</div>`;
   }
   document.getElementById('mcGrid').innerHTML=html;
   renderMiniCal2();
+  renderMiniCal3();
 }
 function irAFecha(f){
   const d=new Date(f+'T00:00:00');
@@ -1996,6 +2077,33 @@ function renderAusCal(){
   document.getElementById('ausListaEl').innerHTML=futuras.length
     ?futuras.map(f=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bor)"><span style="font-size:13px">${labelF(f)}</span><button onclick="quitarAus('${profAusId}','${f}')" style="background:none;border:none;cursor:pointer;color:var(--rojo);font-size:13px">× Quitar</button></div>`).join('')
     :'<div style="font-size:12.5px;color:var(--gm);padding:.5rem 0">Sin ausencias marcadas</div>';
+}
+
+async function toggleFeriado(fecha){
+  if(feriados.has(fecha)){
+    if(!confirm(`¿Quitar el feriado del ${labelF(fecha)}? Ese día vuelve a estar disponible para turnos.`)) return;
+    try{
+      await db.collection('feriados').doc(fecha).delete();
+      toast('Feriado quitado ✓','ok');
+    }catch(e){ toast('Error: '+e.message,'err'); }
+  } else {
+    const motivo = prompt(`Marcar ${labelF(fecha)} como feriado / día no laborable.\n\nMotivo (opcional):`, '');
+    if(motivo===null) return; // canceló
+    try{
+      await db.collection('feriados').doc(fecha).set({
+        motivo: motivo||'', creadoEn: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      toast('Feriado marcado ✓ — no se van a poder sacar turnos ese día','ok');
+    }catch(e){ toast('Error: '+e.message,'err'); }
+  }
+}
+
+function toggleModoFeriados(){
+  modoMarcarFeriados = !modoMarcarFeriados;
+  const btn = document.getElementById('btnModoFeriados');
+  if(btn) btn.classList.toggle('activo', modoMarcarFeriados);
+  toast(modoMarcarFeriados ? '📌 Modo feriados activado: tocá un día del calendario para marcarlo/desmarcarlo' : 'Modo feriados desactivado', 'ok');
+  renderMiniCal();
 }
 
 async function guardarAusenciasFS(profId){
