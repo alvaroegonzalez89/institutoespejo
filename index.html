@@ -809,6 +809,7 @@ let ausCalOff    = 0;
 let mcOffset     = 0;
 let unsubTurnos  = null;
 let unsubPacs    = null;
+let unsubProfsCfg = null;
 
 // ── HELPERS ──────────────────────────────────────────────────
 function hoyStr() {
@@ -1036,6 +1037,29 @@ function iniciarListeners(){
       console.error('onSnapshot pacientes error:', err);
       toast('Error cargando pacientes: '+err.message, 'err');
     });
+
+  // Configuración editable de profesionales (horarios, ausencias, datos básicos):
+  // antes vivía SOLO en memoria y se perdía al recargar. Ahora persiste en Firestore.
+  unsubProfsCfg = db.collection('profsConfig')
+    .onSnapshot(snap=>{
+      snap.docs.forEach(d=>{
+        const cfg = d.data();
+        const p = profs.find(x=>x.id===d.id);
+        if(!p) return; // profesional que ya no existe en PROFS_INIT
+        if(cfg.hs) p.hs = cfg.hs;
+        if(cfg.ape) p.ape = cfg.ape;
+        if(cfg.nom) p.nom = cfg.nom;
+        if(cfg.esp) p.esp = cfg.esp;
+        if(cfg.dur) p.dur = cfg.dur;
+        if(cfg.color) p.color = cfg.color;
+        ausencias[d.id] = new Set(cfg.ausencias||[]);
+      });
+      renderSidebar(); renderAgenda(); renderGestion();
+      if(profAusId) renderAusCal();
+    }, err=>{
+      console.error('onSnapshot profsConfig error:', err);
+      toast('Error cargando configuración de profesionales: '+err.message, 'err');
+    });
 }
 
 // ── STATS ─────────────────────────────────────────────────────
@@ -1086,7 +1110,8 @@ function renderAgenda(){
   const HOY=hoyStr();
   const lunes=getLunes(offSemana);
   const sab=new Date(lunes); sab.setDate(lunes.getDate()+5);
-  document.getElementById('weekLbl').textContent=`${lunes.getDate()} – ${sab.getDate()} de ${MESES[lunes.getMonth()]} ${lunes.getFullYear()}`;
+  document.getElementById('weekLbl').textContent=
+    `${DIAS_C[lunes.getDay()]==='Lun'?'Lunes':DIAS_C[lunes.getDay()]} ${String(lunes.getDate()).padStart(2,'0')} de ${MESES[lunes.getMonth()]} – ${DIAS_C[sab.getDay()]==='Sáb'?'Sábado':DIAS_C[sab.getDay()]} ${String(sab.getDate()).padStart(2,'0')} de ${MESES[sab.getMonth()]} de ${sab.getFullYear()}`;
 
   // Recolectar horas únicas
   const horasSet=new Set();
@@ -1106,12 +1131,14 @@ function renderAgenda(){
   if(!horas.length){ wrap.innerHTML='<div class="empty">Sin horarios disponibles para esta semana</div>'; return; }
 
   // HEAD
+  const DIAS_FULL = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
   let thead = '<thead><tr><th style="width:58px"></th>';
   for(let i=0;i<6;i++){
     const d=new Date(lunes); d.setDate(lunes.getDate()+i);
     const fs=fStr(d); const esH=fs===HOY;
     const cnt=turnos.filter(t=>t.fecha===fs&&t.estado!=='cancelado'&&(profFiltro==='todos'||t.profesionalId===profFiltro)).length;
-    thead+=`<th class="${esH?'hoy':''}">
+    const fechaCompleta = `${DIAS_FULL[d.getDay()]} ${String(d.getDate()).padStart(2,'0')} de ${MESES[d.getMonth()]} de ${d.getFullYear()}`;
+    thead+=`<th class="${esH?'hoy':''}" title="${fechaCompleta}">
       <div class="ag-dnom">${DIAS_C[d.getDay()]}</div>
       ${esH?`<div class="ag-dnum hoy-n">${d.getDate()}</div>`:`<div class="ag-dnum">${d.getDate()}</div>`}
       ${cnt?`<div style="font-size:10px;color:var(--gm)">${cnt}t</div>`:''}
@@ -1169,8 +1196,10 @@ function renderAgenda(){
         const labIco = t.labNombre ? `<span class="tblk-ico" title="Laboratorio: ${t.labNombre}">🧪</span>` : '';
         const notaIco = t.nota ? `<span class="tblk-ico" title="${t.nota.replace(/"/g,'&quot;')}">📝</span>` : '';
         const corrIco = (t.grupoCorrelativo&&rowspan>1) ? `<span class="tblk-ico" title="Turno correlativo (${rowspan} horarios)">🔗</span>` : '';
-        return `<div class="tblk ${estClass}${rowspan>1?' tblk-corr':''}" onclick="verDetalle('${t.id}')">
-          <div class="tn">${t.pacNombre?t.pacNombre:'—'}
+        const nombreCompleto = t.pacNombre||'—';
+        const profCompleto = p?(p.ape+(p.nom?' '+p.nom:'')):'—';
+        return `<div class="tblk ${estClass}${rowspan>1?' tblk-corr':''}" onclick="verDetalle('${t.id}')" title="${nombreCompleto.replace(/"/g,'&quot;')} · ${profCompleto.replace(/"/g,'&quot;')}">
+          <div class="tn">${nombreCompleto}
             ${t.esSobreturno?' <small style="background:#E24B4A;color:white;border-radius:2px;padding:0 3px">ST</small>':''}
             ${estLabel?` <small style="background:rgba(0,0,0,.12);border-radius:2px;padding:0 3px;font-size:9px">${estLabel}</small>`:''}
             <span class="tblk-icos">${labIco}${notaIco}${corrIco}</span>
@@ -1894,15 +1923,14 @@ function agregarFranja(){
   el.appendChild(div);
 }
 
-function guardarProf(){
+async function guardarProf(){
   const id=document.getElementById('epId').value;
   const idx=profs.findIndex(p=>p.id===id); if(idx<0) return;
-  profs[idx].ape=document.getElementById('epApe').value.trim();
-  profs[idx].nom=document.getElementById('epNom').value.trim();
-  profs[idx].esp=document.getElementById('epEsp').value.trim();
-  profs[idx].dur=parseInt(document.getElementById('epDur').value)||30;
-  profs[idx].color=document.getElementById('epColor').value;
-  profs[idx].light=profs[idx].light; // mantener
+  const ape=document.getElementById('epApe').value.trim();
+  const nom=document.getElementById('epNom').value.trim();
+  const esp=document.getElementById('epEsp').value.trim();
+  const dur=parseInt(document.getElementById('epDur').value)||30;
+  const color=document.getElementById('epColor').value;
   const franjas=[];
   document.querySelectorAll('.hora-franja').forEach(f=>{
     const d=parseInt(f.querySelector('[data-f="d"]').value);
@@ -1910,10 +1938,21 @@ function guardarProf(){
     const a=f.querySelector('[data-f="a"]').value;
     if(d&&de&&a) franjas.push({d,de,a});
   });
-  profs[idx].hs=franjas;
-  cerrarModal('mEditProf');
-  renderSidebar(); renderAgenda(); renderGestion();
-  toast('Profesional actualizado ✓','ok');
+
+  try{
+    await db.collection('profsConfig').doc(id).set({
+      ape, nom, esp, dur, color, hs: franjas,
+      actualizadoEn: firebase.firestore.FieldValue.serverTimestamp()
+    }, {merge:true});
+    // Actualización visual inmediata (el listener de Firestore también la va a traer,
+    // pero así se ve al instante sin esperar el round-trip)
+    Object.assign(profs[idx], {ape, nom, esp, dur, color, hs:franjas});
+    cerrarModal('mEditProf');
+    renderSidebar(); renderAgenda(); renderGestion();
+    toast('Profesional actualizado ✓','ok');
+  }catch(e){
+    toast('Error al guardar: '+e.message,'err');
+  }
 }
 
 // ── AUSENCIAS ─────────────────────────────────────────────────
@@ -1958,16 +1997,30 @@ function renderAusCal(){
     :'<div style="font-size:12.5px;color:var(--gm);padding:.5rem 0">Sin ausencias marcadas</div>';
 }
 
+async function guardarAusenciasFS(profId){
+  const ausSet = ausencias[profId] || new Set();
+  try{
+    await db.collection('profsConfig').doc(profId).set({
+      ausencias: [...ausSet],
+      actualizadoEn: firebase.firestore.FieldValue.serverTimestamp()
+    }, {merge:true});
+  }catch(e){
+    toast('Error al guardar ausencia: '+e.message,'err');
+  }
+}
+
 function toggleAus(fecha){
   const ausSet=ausencias[profAusId];
   if(ausSet.has(fecha)) ausSet.delete(fecha);
   else ausSet.add(fecha);
   renderAusCal(); renderGestion(); renderAgenda();
+  guardarAusenciasFS(profAusId);
 }
 function quitarAus(profId,fecha){
   ausencias[profId]?.delete(fecha);
   if(profAusId===profId) renderAusCal();
   renderGestion(); renderAgenda();
+  guardarAusenciasFS(profId);
 }
 
 // ── PACIENTES ─────────────────────────────────────────────────
