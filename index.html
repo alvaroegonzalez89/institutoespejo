@@ -1352,7 +1352,11 @@ function mcNav3(d){ mcOffset3+=d; renderMiniCal3(); }
 
 // Devuelve true si `fs` (YYYY-MM-DD) cae dentro de la semana actualmente
 // mostrada en la agenda (lunes a sábado), para resaltarla en los mini-calendarios.
+// Solo aplica si navegaste a OTRA semana distinta de la actual — si estás
+// parado en la semana de hoy (offSemana=0), no hace falta remarcarla aparte,
+// ya que "hoy" ya queda marcado con su propio círculo.
 function esSemanaSeleccionada(fs){
+  if(offSemana===0) return false;
   const lunes = getLunes(offSemana);
   const sab = new Date(lunes); sab.setDate(lunes.getDate()+5);
   return fs >= fStr(lunes) && fs <= fStr(sab);
