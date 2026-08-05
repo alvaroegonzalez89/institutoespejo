@@ -1111,7 +1111,7 @@ function renderAgenda(){
   const lunes=getLunes(offSemana);
   const sab=new Date(lunes); sab.setDate(lunes.getDate()+5);
   document.getElementById('weekLbl').textContent=
-    `${DIAS_C[lunes.getDay()]==='Lun'?'Lunes':DIAS_C[lunes.getDay()]} ${String(lunes.getDate()).padStart(2,'0')} de ${MESES[lunes.getMonth()]} – ${DIAS_C[sab.getDay()]==='Sáb'?'Sábado':DIAS_C[sab.getDay()]} ${String(sab.getDate()).padStart(2,'0')} de ${MESES[sab.getMonth()]} de ${sab.getFullYear()}`;
+    `${lunes.getDate()} de ${MESES[lunes.getMonth()]} – ${sab.getDate()} de ${MESES[sab.getMonth()]} de ${sab.getFullYear()}`;
 
   // Recolectar horas únicas
   const horasSet=new Set();
@@ -1139,8 +1139,9 @@ function renderAgenda(){
     const cnt=turnos.filter(t=>t.fecha===fs&&t.estado!=='cancelado'&&(profFiltro==='todos'||t.profesionalId===profFiltro)).length;
     const fechaCompleta = `${DIAS_FULL[d.getDay()]} ${String(d.getDate()).padStart(2,'0')} de ${MESES[d.getMonth()]} de ${d.getFullYear()}`;
     thead+=`<th class="${esH?'hoy':''}" title="${fechaCompleta}">
-      <div class="ag-dnom">${DIAS_C[d.getDay()]}</div>
+      <div class="ag-dnom">${DIAS_FULL[d.getDay()]}</div>
       ${esH?`<div class="ag-dnum hoy-n">${d.getDate()}</div>`:`<div class="ag-dnum">${d.getDate()}</div>`}
+      <div style="font-size:9.5px;color:var(--gm);white-space:nowrap">de ${MESES[d.getMonth()]} de ${d.getFullYear()}</div>
       ${cnt?`<div style="font-size:10px;color:var(--gm)">${cnt}t</div>`:''}
     </th>`;
   }
