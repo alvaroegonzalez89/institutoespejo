@@ -1153,13 +1153,13 @@ function irHoy(){ offSemana=0; renderAgenda(); renderMiniCal(); }
 function renderAgenda(){
   const HOY=hoyStr();
   const lunes=getLunes(offSemana);
-  const sab=new Date(lunes); sab.setDate(lunes.getDate()+5);
+  const vie=new Date(lunes); vie.setDate(lunes.getDate()+4);
   document.getElementById('weekLbl').textContent=
-    `${lunes.getDate()} de ${MESES[lunes.getMonth()]} – ${sab.getDate()} de ${MESES[sab.getMonth()]} de ${sab.getFullYear()}`;
+    `${lunes.getDate()} de ${MESES[lunes.getMonth()]} – ${vie.getDate()} de ${MESES[vie.getMonth()]} de ${vie.getFullYear()}`;
 
   // Recolectar horas únicas
   const horasSet=new Set();
-  for(let i=0;i<6;i++){
+  for(let i=0;i<5;i++){
     const d=new Date(lunes); d.setDate(lunes.getDate()+i);
     const fs=fStr(d);
     profs.forEach(p=>{
@@ -1177,7 +1177,7 @@ function renderAgenda(){
   // HEAD
   const DIAS_FULL = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
   let thead = '<thead><tr><th style="width:58px"></th>';
-  for(let i=0;i<6;i++){
+  for(let i=0;i<5;i++){
     const d=new Date(lunes); d.setDate(lunes.getDate()+i);
     const fs=fStr(d); const esH=fs===HOY;
     const cnt=turnos.filter(t=>t.fecha===fs&&t.estado!=='cancelado'&&(profFiltro==='todos'||t.profesionalId===profFiltro)).length;
@@ -1194,13 +1194,13 @@ function renderAgenda(){
 
   // BODY
   let tbody = '<tbody>';
-  const skipCol = [0,0,0,0,0,0]; // filas restantes a saltear por columna (por rowspan de correlativos)
+  const skipCol = [0,0,0,0,0]; // filas restantes a saltear por columna (por rowspan de correlativos)
 
   const getTs = (fs,hora) => turnos.filter(t=>t.fecha===fs&&t.hora===hora&&t.estado!=='cancelado'&&(profFiltro==='todos'||t.profesionalId===profFiltro));
 
   horas.forEach((hora,rIdx)=>{
     tbody += `<tr><td>${hora}</td>`;
-    for(let i=0;i<6;i++){
+    for(let i=0;i<5;i++){
       const d=new Date(lunes); d.setDate(lunes.getDate()+i);
       const fs=fStr(d); const esH=fs===HOY;
 
@@ -1371,15 +1371,16 @@ function mcNav2(d){ mcOffset2+=d; renderMiniCal2(); }
 function mcNav3(d){ mcOffset3+=d; renderMiniCal3(); }
 
 // Devuelve true si `fs` (YYYY-MM-DD) cae dentro de la semana actualmente
-// mostrada en la agenda (lunes a sábado), para resaltarla en los mini-calendarios.
+// mostrada en la agenda (lunes a viernes — el sábado ya no está disponible),
+// para resaltarla en los mini-calendarios.
 // Solo aplica si navegaste a OTRA semana distinta de la actual — si estás
 // parado en la semana de hoy (offSemana=0), no hace falta remarcarla aparte,
 // ya que "hoy" ya queda marcado con su propio círculo.
 function esSemanaSeleccionada(fs){
   if(offSemana===0) return false;
   const lunes = getLunes(offSemana);
-  const sab = new Date(lunes); sab.setDate(lunes.getDate()+5);
-  return fs >= fStr(lunes) && fs <= fStr(sab);
+  const vie = new Date(lunes); vie.setDate(lunes.getDate()+4);
+  return fs >= fStr(lunes) && fs <= fStr(vie);
 }
 
 function renderMiniCal2(){
