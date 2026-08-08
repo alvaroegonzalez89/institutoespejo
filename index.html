@@ -121,8 +121,8 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
 .mc-d.aus-prof{background:var(--rojop)!important;color:var(--rojo)!important;cursor:not-allowed;text-decoration:line-through}
 .mc-d.no-atiende{color:var(--bor)!important;cursor:not-allowed;background:var(--gc)!important;opacity:.6}
 .mc-d.feriado{background:#B91C1C!important;color:white!important;font-weight:600;text-decoration:line-through}
-.mc-d.semana-sel{border-color:var(--azul)!important;box-shadow:inset 0 0 0 1px var(--azul)}
-.mc-d.semana-sel.hoy{box-shadow:0 0 0 2px var(--azul)}
+.mc-d.semana-sel{background:var(--azulp)!important;color:var(--azul)}
+.mc-d.semana-sel.hoy{background:var(--azul)!important;color:white!important;box-shadow:0 0 0 2px var(--azulp)}
 #btnModoFeriados.activo{background:#B91C1C;color:white;border-color:#B91C1C}
 .stat-sm{background:var(--gc);border-radius:var(--r);padding:.65rem .85rem;margin-bottom:.5rem}
 .stat-sm-v{font-size:20px;font-weight:600;color:var(--azul);line-height:1}
@@ -151,6 +151,8 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
 .ag-table td:not(:first-child):hover{background:rgba(26,78,122,.03)}
 .ag-table td.no-trabaja{background:repeating-linear-gradient(45deg,#f5f4f0,#f5f4f0 6px,#ebe9e3 6px,#ebe9e3 12px);cursor:not-allowed}
 .ag-table td.no-trabaja:hover{background:repeating-linear-gradient(45deg,#f5f4f0,#f5f4f0 6px,#ebe9e3 6px,#ebe9e3 12px)}
+.ag-table td.sobre-disp{background:repeating-linear-gradient(45deg,#FDECEC,#FDECEC 6px,#FBDADA 6px,#FBDADA 12px);cursor:pointer}
+.ag-table td.sobre-disp:hover{background:repeating-linear-gradient(45deg,#FCE0E0,#FCE0E0 6px,#F9C9C9 6px,#F9C9C9 12px)}
 .tblk{border-radius:5px;padding:3px 6px;font-size:11px;line-height:1.3;cursor:pointer;margin-bottom:2px;border-left:3px solid;transition:.1s;position:relative}
 .tblk-corr{height:100%;display:flex;flex-direction:column;justify-content:center}
 .tblk:hover{filter:brightness(.95);box-shadow:0 1px 4px rgba(0,0,0,.15)}
@@ -867,26 +869,37 @@ function generarSlots(profId, fecha){
   if(!franjas.length) return [];
   const slots=[];
   franjas.forEach(f=>{
+    const esSobre = f.tipo==='sobre';
+    const dur = esSobre ? (f.dur||15) : p.dur;
     let cur=f.de;
-    while(cur<=addMins(f.a,-p.dur)||cur===f.de){
+    while(cur<=addMins(f.a,-dur)||cur===f.de){
       if(cur>f.a) break;
       const ocup=turnos.filter(t=>t.profesionalId===profId&&t.fecha===fecha&&t.hora===cur&&t.estado!=='cancelado');
-      slots.push({hora:cur, libre:ocup.length===0, n:ocup.length});
-      const sig=addMins(cur,p.dur);
+      slots.push({hora:cur, libre:ocup.length===0, n:ocup.length, esSobre});
+      const sig=addMins(cur,dur);
       if(sig>=f.a) break;
       cur=sig;
     }
     // incluir último slot si cabe
-    const ult=addMins(f.a,-p.dur);
+    const ult=addMins(f.a,-dur);
     if(ult>=f.de && !slots.find(s=>s.hora===ult)){
       const ocup=turnos.filter(t=>t.profesionalId===profId&&t.fecha===fecha&&t.hora===ult&&t.estado!=='cancelado');
-      slots.push({hora:ult, libre:ocup.length===0, n:ocup.length});
+      slots.push({hora:ult, libre:ocup.length===0, n:ocup.length, esSobre});
     }
   });
-  // deduplicar y ordenar
-  const seen=new Set();
-  return slots.filter(s=>{ if(seen.has(s.hora)) return false; seen.add(s.hora); return true; })
-              .sort((a,b)=>a.hora.localeCompare(b.hora));
+  // deduplicar (si un horario cae en franja normal Y sobre, prioriza normal) y ordenar
+  const seen=new Map();
+  slots.forEach(s=>{
+    const prev=seen.get(s.hora);
+    if(!prev || (prev.esSobre && !s.esSobre)) seen.set(s.hora, s);
+  });
+  return [...seen.values()].sort((a,b)=>a.hora.localeCompare(b.hora));
+}
+
+// Franjas de horario NORMAL (excluye las de sobreturno) — para saber si el
+// profesional "trabaja" ese día/hora en el sentido tradicional.
+function franjasNormales(p, dow){
+  return p.hs.filter(h=>h.d===dow && h.tipo!=='sobre');
 }
 
 function generarSlotsUrgente(profId, fecha){
@@ -1134,8 +1147,8 @@ function renderSidebar(){
 function filtrarProf(id){ profFiltro=id; renderSidebar(); renderAgenda(); renderTurnosHoy(); renderRecordatorios(); renderMiniCal(); }
 
 // ── AGENDA ────────────────────────────────────────────────────
-function cambiarSem(d){ offSemana+=d; renderAgenda(); }
-function irHoy(){ offSemana=0; renderAgenda(); }
+function cambiarSem(d){ offSemana+=d; renderAgenda(); renderMiniCal(); }
+function irHoy(){ offSemana=0; renderAgenda(); renderMiniCal(); }
 
 function renderAgenda(){
   const HOY=hoyStr();
@@ -1197,6 +1210,7 @@ function renderAgenda(){
 
       // Determinar si la celda es "no trabaja" (tachada) - solo aplica si hay 1 prof filtrado
       let noTrabaja = false;
+      let enFranjaSobreConfigurada = false; // hora cubierta por una franja de sobreturno pre-cargada
       const esFeriadoDia = feriados.has(fs);
       if(esFeriadoDia){
         noTrabaja = true;
@@ -1204,8 +1218,9 @@ function renderAgenda(){
         const p = gProf(profFiltro);
         if(p && !tieneAus(profFiltro,fs)){
           const dow = d.getDay();
-          const enFranja = p.hs.some(h => h.d===dow && hora>=h.de && hora<h.a);
-          noTrabaja = !enFranja;
+          const enFranja = franjasNormales(p,dow).some(h => hora>=h.de && hora<h.a);
+          enFranjaSobreConfigurada = p.hs.some(h => h.d===dow && h.tipo==='sobre' && hora>=h.de && hora<h.a);
+          noTrabaja = !enFranja; // tachado si no hay franja NORMAL, aunque tenga sobreturno configurado
         } else if(p && tieneAus(profFiltro,fs)){
           noTrabaja = true;
         }
@@ -1248,24 +1263,29 @@ function renderAgenda(){
       const bloqueo = turnos.find(t=>t.profesionalId===(profFiltro!=='todos'?profFiltro:null)&&t.fecha===fs&&t.hora===hora&&t.estado==='bloqueado');
       const esBloqueado = !!bloqueo && profFiltro!=='todos';
 
-      let cellClass = [esH?'hoy':'', noTrabaja&&!esBloqueado?'no-trabaja':'', esBloqueado?'bloqueado':''].filter(Boolean).join(' ');
+      let cellClass = [esH?'hoy':'', noTrabaja&&!esBloqueado?'no-trabaja':'', noTrabaja&&enFranjaSobreConfigurada?'sobre-disp':'', esBloqueado?'bloqueado':''].filter(Boolean).join(' ');
       
       let cellContent = bloques;
       if(esBloqueado){
         cellContent = `<div class="blk-lbl">🚫 ${bloqueo.nota||'Bloqueado'}</div>`;
+      } else if(noTrabaja&&enFranjaSobreConfigurada&&!bloques){
+        cellContent = `<div class="blk-lbl" style="color:#B91C1C">🕐 Sobreturno</div>`;
       }
 
       // noTrabaja pero clickeable para sobreturno de urgencia / bloqueado clickeable para reactivar
       let cellClick = '';
       if(esBloqueado){
         cellClick = `onclick="celdaClickBloqueado('${bloqueo.id}')"`;
+      } else if(noTrabaja&&enFranjaSobreConfigurada){
+        // Franja de sobreturno pre-cargada por el profesional: se agenda directo, sin confirmar
+        cellClick = `onclick="celdaClick('${fs}','${hora}')"`;
       } else if(noTrabaja){
         cellClick = `onclick="celdaClickUrgente('${fs}','${hora}')"`;
       } else {
         cellClick = `onclick="celdaClick('${fs}','${hora}')"`;
       }
       const rowspanAttr = rowspan>1 ? ` rowspan="${rowspan}"` : '';
-      const titleAttr = esBloqueado?'Clic para reactivar este horario':(noTrabaja?'Clic para sobreturno de urgencia':'');
+      const titleAttr = esBloqueado?'Clic para reactivar este horario':(noTrabaja&&enFranjaSobreConfigurada?'Sobreturno configurado — clic para agendar':(noTrabaja?'Clic para sobreturno de urgencia':''));
       tbody+=`<td class="${cellClass}"${rowspanAttr} ${cellClick} title="${titleAttr}">${cellContent}</td>`;
     }
     tbody += '</tr>';
@@ -1431,7 +1451,7 @@ function renderMiniCal(){
 
     if(profEsp){
       // Vista filtrada por profesional: marcar días que atiende / ausencia
-      const trabaja = profEsp.hs.some(h=>h.d===fd.getDay());
+      const trabaja = franjasNormales(profEsp, fd.getDay()).length>0;
       const ausente = tieneAus(profFiltro, fs);
       if(ausente){ claseExtra=' aus-prof'; clickeable=false; }
       else if(!trabaja){ claseExtra=' no-atiende'; clickeable=false; }
@@ -1471,6 +1491,7 @@ function irAFecha(f){
   const base=getLunes(0);
   offSemana=Math.round((lunes-base)/(7*24*3600*1000));
   renderAgenda();
+  renderMiniCal();
 }
 
 // ── NUEVO TURNO ───────────────────────────────────────────────
@@ -1561,6 +1582,16 @@ function actualizarSlots(){
   }
 
   grid.innerHTML = slots.map(s=>{
+    if(s.esSobre){
+      // Slot proveniente de una franja de sobreturno pre-configurada por el profesional
+      return `<button class="slot-btn${!s.libre?' sobre-slot':''}" data-hora="${s.hora}" data-sobre="1"
+        onclick="${s.libre?`selSlot(this,'${s.hora}')`:''}"
+        ${!s.libre?'disabled':''}
+        style="border-color:#E24B4A;color:${s.libre?'#B91C1C':'#ddd'}"
+        title="Sobreturno configurado">
+        ${s.hora} <span style="font-size:9px">ST</span>
+      </button>`;
+    }
     if(esSobre){
       return `<button class="slot-btn${!s.libre?' sobre-slot':''}" data-hora="${s.hora}"
         onclick="selSlot(this,'${s.hora}')"
@@ -1579,6 +1610,10 @@ function selSlot(btn,h){
   document.querySelectorAll('.slot-btn').forEach(b=>b.classList.remove('sel'));
   btn.classList.add('sel');
   document.getElementById('nHora').value=h;
+  // Si el horario viene de una franja de sobreturno pre-configurada, tildar "Sobreturno" solo
+  if(btn.dataset.sobre==='1'){
+    document.getElementById('nSobre').checked=true;
+  }
   // Habilitar botón de correlativos
   const btnCorr = document.getElementById('btnCorr');
   if(btnCorr) btnCorr.disabled=false;
@@ -1989,6 +2024,11 @@ function abrirEditProf(id){
       <input type="time" class="finput" style="width:105px" value="${h.de}" data-idx="${i}" data-f="de">
       <span style="color:var(--gm)">a</span>
       <input type="time" class="finput" style="width:105px" value="${h.a}" data-idx="${i}" data-f="a">
+      <label style="display:flex;align-items:center;gap:4px;font-size:11.5px;color:#B91C1C;cursor:pointer">
+        <input type="checkbox" data-f="sobre" ${h.tipo==='sobre'?'checked':''} onchange="this.closest('.hora-franja').querySelector('[data-f=durSobre]').style.display=this.checked?'':'none'">
+        Sobreturno
+      </label>
+      <input type="number" class="finput" min="5" step="5" style="width:65px;display:${h.tipo==='sobre'?'':'none'}" value="${h.dur||15}" data-f="durSobre" title="Duración de este turno (min)" placeholder="min">
       <button class="btn-s" style="padding:4px 8px;color:var(--rojo)" onclick="this.closest('.hora-franja').remove()">✕</button>
     </div>
   `).join('');
@@ -2004,6 +2044,11 @@ function agregarFranja(){
     <input type="time" class="finput" style="width:105px" value="09:00" data-idx="${i}" data-f="de">
     <span style="color:var(--gm)">a</span>
     <input type="time" class="finput" style="width:105px" value="13:00" data-idx="${i}" data-f="a">
+    <label style="display:flex;align-items:center;gap:4px;font-size:11.5px;color:#B91C1C;cursor:pointer">
+      <input type="checkbox" data-f="sobre" onchange="this.closest('.hora-franja').querySelector('[data-f=durSobre]').style.display=this.checked?'':'none'">
+      Sobreturno
+    </label>
+    <input type="number" class="finput" min="5" step="5" style="width:65px;display:none" value="15" data-f="durSobre" title="Duración de este turno (min)" placeholder="min">
     <button class="btn-s" style="padding:4px 8px;color:var(--rojo)" onclick="this.closest('.hora-franja').remove()">✕</button>
   `;
   el.appendChild(div);
@@ -2022,7 +2067,13 @@ async function guardarProf(){
     const d=parseInt(f.querySelector('[data-f="d"]').value);
     const de=f.querySelector('[data-f="de"]').value;
     const a=f.querySelector('[data-f="a"]').value;
-    if(d&&de&&a) franjas.push({d,de,a});
+    const esSobre=f.querySelector('[data-f="sobre"]').checked;
+    const durSobre=parseInt(f.querySelector('[data-f="durSobre"]').value)||15;
+    if(d&&de&&a){
+      const franja={d,de,a};
+      if(esSobre){ franja.tipo='sobre'; franja.dur=durSobre; }
+      franjas.push(franja);
+    }
   });
 
   try{
