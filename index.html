@@ -167,6 +167,44 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
 .tblk-icos{display:flex;gap:2px;align-items:center;flex-shrink:0}
 .tblk-ico{font-size:10px;cursor:help}
 
+/* AGENDA POR PROFESIONAL — columnas lado a lado (estilo Bilog) */
+.ag-cols-scroll{overflow-y:auto;max-height:560px}
+.ag-cols-wrap{display:grid;grid-template-columns:repeat(5,1fr);gap:0}
+.ag-daycol{border-right:1px solid var(--bor);display:flex;flex-direction:column;min-width:0}
+.ag-daycol:last-child{border-right:none}
+.ag-daycol.hoy{background:rgba(235,243,251,.35)}
+.ag-daycol-hdr{padding:9px 6px;text-align:center;border-bottom:1px solid var(--bor);background:white;position:sticky;top:0;z-index:2}
+.ag-daycol.hoy .ag-daycol-hdr{background:var(--azulp)}
+.ag-dc-nom{font-size:10.5px;font-weight:600;color:var(--gm);text-transform:capitalize;letter-spacing:.2px}
+.ag-dc-fecha{font-size:11.5px;font-weight:500;color:var(--go);margin-top:1px}
+.ag-daycol.hoy .ag-dc-fecha{color:var(--azul)}
+.ag-dc-cnt{font-size:9.5px;color:var(--gm);margin-top:1px}
+.ag-daytable{width:100%;border-collapse:collapse;table-layout:fixed}
+.ag-daytable th{font-size:9.5px;color:var(--gm);text-transform:uppercase;letter-spacing:.4px;font-weight:600;text-align:left;padding:5px 6px;border-bottom:1px solid var(--bor);background:var(--gc)}
+.ag-daytable th:first-child{width:46px}
+.ag-daytable td{padding:5px 6px;border-bottom:1px solid var(--bor);font-size:11.5px;vertical-align:top;cursor:pointer;transition:background .1s}
+.ag-daytable tr:last-child td{border-bottom:none}
+.ag-dt-hora{font-size:11px;color:var(--azul);font-weight:600;white-space:nowrap}
+.ag-daytable tr:hover td{background:rgba(26,78,122,.04)}
+.ag-dt-libre{color:var(--bor);font-style:italic}
+.ag-daytable tr.ocupado td{background:rgba(0,0,0,.015)}
+.ag-daytable tr.ocupado.est-espera td{background:var(--ambarp)}
+.ag-daytable tr.ocupado.est-dado td{background:var(--verdep)}
+.ag-daytable tr.ocupado.est-presente td{background:#d1fae5}
+.ag-daytable tr.ocupado.est-asa td{background:var(--rojop)}
+.ag-daytable tr.ocupado.est-aca td{background:#FFEAD1}
+.ag-daytable tr.ocupado.sobre td{background:#FFE4E4}
+.ag-daytable tr.no-trabaja td{background:repeating-linear-gradient(45deg,#f5f4f0,#f5f4f0 6px,#ebe9e3 6px,#ebe9e3 12px);color:var(--bor);cursor:pointer}
+.ag-daytable tr.no-trabaja .ag-dt-hora{color:var(--bor);text-decoration:line-through}
+.ag-daytable tr.sobre-disp td{background:repeating-linear-gradient(45deg,#FDECEC,#FDECEC 6px,#FBDADA 6px,#FBDADA 12px)}
+.ag-daytable tr.sobre-disp .ag-dt-hora{color:#B91C1C;text-decoration:line-through}
+.ag-daytable tr.sobre-disp:hover td{background:repeating-linear-gradient(45deg,#FCE0E0,#FCE0E0 6px,#F9C9C9 6px,#F9C9C9 12px)}
+.ag-daytable tr.bloqueado td{background:repeating-linear-gradient(135deg,#fef3f3,#fef3f3 5px,#fde8e8 5px,#fde8e8 10px);cursor:pointer}
+.ag-daytable tr.bloqueado .ag-dt-hora{color:#B91C1C}
+.ag-dt-nom{font-weight:500;display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.ag-dt-det{font-size:10px;color:var(--gm);margin-top:1px}
+.ag-dc-empty{padding:1.5rem .75rem;text-align:center;font-size:11.5px;color:var(--gm)}
+
 /* TOOLBAR */
 .toolbar{display:flex;align-items:center;gap:8px;margin-bottom:.85rem;flex-wrap:wrap}
 .wk-nav{display:flex;align-items:center;gap:6px;background:white;border:1px solid var(--bor);border-radius:var(--r);padding:5px 10px}
@@ -361,6 +399,7 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
             <button class="wk-btn" onclick="cambiarSem(1)">›</button>
           </div>
           <button class="btn-s" onclick="irHoy()">Hoy</button>
+          <span id="profActualLbl" style="font-size:13px;font-weight:500;color:var(--azul)"></span>
           <div class="ml-auto"></div>
           <button class="btn-s" onclick="abrirBloquearSlot()" title="Anular un horario puntual" style="color:#B91C1C;border-color:rgba(185,28,28,.3)">
             🚫 Anular horario
@@ -818,7 +857,7 @@ profs.forEach(p => ausencias[p.id] = new Set());
 let feriados = new Set(); // fechas YYYY-MM-DD marcadas como no laborables para toda la clínica
 let modoMarcarFeriados = false;
 
-let profFiltro   = 'todos';
+let profFiltro   = (PROFS_INIT[0] && PROFS_INIT[0].id) || null; // siempre un profesional puntual — ya no existe la vista "todos"
 let offSemana    = 0;
 let profSelDoc   = null;
 let diaSelDoc    = hoyStr();
@@ -1128,10 +1167,8 @@ function actualizarStats(){
 // ── SIDEBAR ───────────────────────────────────────────────────
 function renderSidebar(){
   const el=document.getElementById('profList');
-  let html=`<button class="prof-chip${profFiltro==='todos'?' active':''}" onclick="filtrarProf('todos')">
-    <div class="pdot" style="background:var(--azul)"></div>
-    <div style="font-size:12px;font-weight:500;color:var(--go)">Todos</div>
-  </button>`;
+  if(!profFiltro && profs.length) profFiltro=profs[0].id; // fallback si por algún motivo quedó sin selección
+  let html='';
   profs.forEach(p=>{
     html+=`<button class="prof-chip${profFiltro===p.id?' active':''}" onclick="filtrarProf('${p.id}')">
       <div class="pdot" style="background:${p.color}"></div>
@@ -1150,6 +1187,100 @@ function filtrarProf(id){ profFiltro=id; renderSidebar(); renderAgenda(); render
 function cambiarSem(d){ offSemana+=d; renderAgenda(); renderMiniCal(); }
 function irHoy(){ offSemana=0; renderAgenda(); renderMiniCal(); }
 
+const DIAS_FULL = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+
+// Arma las filas (Hora | Paciente) de UN día para el profesional seleccionado.
+// Reutiliza exactamente la misma lógica de disponibilidad/sobreturnos/bloqueos
+// que ya existía en la agenda semanal combinada — solo cambia cómo se pinta.
+function construirFilasDia(profId, fs, d){
+  const p = gProf(profId);
+  if(!p) return {estadoDia:'sin-prof', filas:[]};
+  if(feriados.has(fs)) return {estadoDia:'feriado', filas:[]};
+  if(tieneAus(profId, fs)) return {estadoDia:'ausente', filas:[]};
+
+  const dow = d.getDay();
+
+  // Horas a mostrar: las que salen de generarSlots (franjas normales + sobreturno
+  // configurado) más las de cualquier turno ya agendado ese día (por si quedó un
+  // sobreturno de urgencia fuera de esas franjas).
+  const horasSet = new Set();
+  generarSlots(profId, fs).forEach(s=>horasSet.add(s.hora));
+  turnos.filter(t=>t.profesionalId===profId&&t.fecha===fs&&t.estado!=='cancelado').forEach(t=>horasSet.add(t.hora));
+  const horas=[...horasSet].sort();
+  if(!horas.length) return {estadoDia:'sin-horario', filas:[]};
+
+  const getTs = (hora) => turnos.filter(t=>t.profesionalId===profId&&t.fecha===fs&&t.hora===hora&&t.estado!=='cancelado');
+
+  const filas=[];
+  let skip=0;
+  horas.forEach((hora, idx)=>{
+    if(skip>0){ skip--; return; }
+    const ts = getTs(hora);
+
+    const enFranja = franjasNormales(p,dow).some(h=>hora>=h.de && hora<h.a);
+    const enFranjaSobreConfigurada = p.hs.some(h=>h.d===dow && h.tipo==='sobre' && hora>=h.de && hora<h.a);
+    const noTrabaja = !enFranja;
+
+    // Fusionar turnos correlativos consecutivos en una sola fila (mismo criterio que antes, sin rowspan de tabla)
+    let horaFin = null, rango = 1;
+    if(ts.length===1 && ts[0].grupoCorrelativo){
+      const grp = ts[0].grupoCorrelativo;
+      let look = idx+1, ultima = hora;
+      while(look<horas.length){
+        const tsN = getTs(horas[look]);
+        if(tsN.length===1 && tsN[0].grupoCorrelativo===grp){
+          ultima = horas[look]; look++; skip++; rango++;
+        } else break;
+      }
+      if(rango>1) horaFin = addMins(ultima, p.dur||30);
+    }
+
+    const bloqueo = turnos.find(t=>t.profesionalId===profId&&t.fecha===fs&&t.hora===hora&&t.estado==='bloqueado');
+    const esBloqueado = !!bloqueo;
+
+    filas.push({hora, horaFin, ts, rango, noTrabaja, enFranjaSobreConfigurada, esBloqueado, bloqueo});
+  });
+  return {estadoDia:'ok', filas};
+}
+
+function renderFilaDia(fila, fs){
+  if(fila.esBloqueado){
+    return {claseFila:'bloqueado', click:`celdaClickBloqueado('${fila.bloqueo.id}')`, titulo:'Clic para reactivar este horario',
+      contenido:`<div class="ag-dt-nom">🚫 ${fila.bloqueo.nota||'Anulado'}</div>`};
+  }
+  if(fila.noTrabaja && fila.enFranjaSobreConfigurada && !fila.ts.length){
+    // Franja de sobreturno pre-cargada por el profesional: tachada pero se agenda directo, sin confirmar
+    return {claseFila:'sobre-disp', click:`celdaClick('${fs}','${fila.hora}')`, titulo:'Sobreturno configurado — clic para agendar',
+      contenido:`<div class="ag-dt-nom">🕐 Sobreturno disponible</div>`};
+  }
+  if(fila.noTrabaja && !fila.ts.length){
+    return {claseFila:'no-trabaja', click:`celdaClickUrgente('${fs}','${fila.hora}')`, titulo:'Clic para sobreturno de urgencia',
+      contenido:`<div class="ag-dt-nom">No atiende</div>`};
+  }
+  if(!fila.ts.length){
+    return {claseFila:'', click:`celdaClick('${fs}','${fila.hora}')`, titulo:'Clic para agendar',
+      contenido:`<div class="ag-dt-libre">— disponible —</div>`};
+  }
+  // Ocupado — uno o más turnos en esa hora (normalmente 1)
+  const partes = fila.ts.map(t=>{
+    const estado = t.estado || 'espera';
+    const estLabel = {espera:'',dado:'',presente:'P',asa:'ASA',aca:'ACA'}[estado] || '';
+    const labIco = t.labNombre ? `<span class="tblk-ico" title="Laboratorio: ${t.labNombre}">🧪</span>` : '';
+    const notaIco = t.nota ? `<span class="tblk-ico" title="${t.nota.replace(/"/g,'&quot;')}">📝</span>` : '';
+    const corrIco = (t.grupoCorrelativo && fila.rango>1) ? `<span class="tblk-ico" title="Turno correlativo (${fila.rango} horarios)">🔗</span>` : '';
+    return `<div class="ag-dt-nom" onclick="event.stopPropagation();verDetalle('${t.id}')" title="${(t.pacNombre||'').replace(/"/g,'&quot;')}">
+      ${t.pacNombre||'—'}
+      ${t.esSobreturno?' <small style="background:#E24B4A;color:white;border-radius:2px;padding:0 3px;font-size:9px">ST</small>':''}
+      ${estLabel?` <small style="background:rgba(0,0,0,.12);border-radius:2px;padding:0 3px;font-size:9px">${estLabel}</small>`:''}
+      <span class="tblk-icos">${labIco}${notaIco}${corrIco}</span>
+    </div>
+    <div class="ag-dt-det">${t.servicio||''}</div>`;
+  }).join('');
+  const estadoPrincipal = fila.ts[0].estado || 'espera';
+  const claseFila = 'ocupado est-'+estadoPrincipal + (fila.ts[0].esSobreturno?' sobre':'');
+  return {claseFila, click:`verDetalle('${fila.ts[0].id}')`, titulo:'Ver / editar turno', contenido:partes};
+}
+
 function renderAgenda(){
   const HOY=hoyStr();
   const lunes=getLunes(offSemana);
@@ -1157,152 +1288,64 @@ function renderAgenda(){
   document.getElementById('weekLbl').textContent=
     `${lunes.getDate()} de ${MESES[lunes.getMonth()]} – ${vie.getDate()} de ${MESES[vie.getMonth()]} de ${vie.getFullYear()}`;
 
-  // Recolectar horas únicas
-  const horasSet=new Set();
-  for(let i=0;i<5;i++){
-    const d=new Date(lunes); d.setDate(lunes.getDate()+i);
-    const fs=fStr(d);
-    profs.forEach(p=>{
-      if(profFiltro!=='todos'&&p.id!==profFiltro) return;
-      generarSlots(p.id,fs).forEach(s=>horasSet.add(s.hora));
-    });
-    turnos.filter(t=>t.fecha===fs&&(profFiltro==='todos'||t.profesionalId===profFiltro)).forEach(t=>horasSet.add(t.hora));
-  }
-  const horas=[...horasSet].sort();
-
-  // Construir tabla completa
   const wrap = document.getElementById('agendaTableWrap');
-  if(!horas.length){ wrap.innerHTML='<div class="empty">Sin horarios disponibles para esta semana</div>'; return; }
+  const p = gProf(profFiltro);
+  const lbl = document.getElementById('profActualLbl');
+  if(!p){
+    if(lbl) lbl.textContent='';
+    wrap.innerHTML = '<div class="empty">Seleccioná un profesional en la columna izquierda</div>';
+    return;
+  }
+  if(lbl) lbl.textContent = `${p.ape}${p.nom?', '+p.nom:''}`;
 
-  // HEAD
-  const DIAS_FULL = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
-  let thead = '<thead><tr><th style="width:58px"></th>';
+  let cols='';
   for(let i=0;i<5;i++){
     const d=new Date(lunes); d.setDate(lunes.getDate()+i);
     const fs=fStr(d); const esH=fs===HOY;
-    const cnt=turnos.filter(t=>t.fecha===fs&&t.estado!=='cancelado'&&(profFiltro==='todos'||t.profesionalId===profFiltro)).length;
-    const fechaCompleta = `${DIAS_FULL[d.getDay()]} ${String(d.getDate()).padStart(2,'0')} de ${MESES[d.getMonth()]} de ${d.getFullYear()}`;
-    const esFer = feriados.has(fs);
-    thead+=`<th class="${esH?'hoy':''}" title="${esFer?'Feriado — '+fechaCompleta:fechaCompleta}">
-      ${esFer?'<div style="font-size:9px;color:#B91C1C;font-weight:700">🎉 FERIADO</div>':''}      <div class="ag-dnom">${DIAS_FULL[d.getDay()]}</div>
-      ${esH?`<div class="ag-dnum hoy-n">${d.getDate()}</div>`:`<div class="ag-dnum">${d.getDate()}</div>`}
-      <div style="font-size:9.5px;color:var(--gm);white-space:nowrap">de ${MESES[d.getMonth()]} de ${d.getFullYear()}</div>
-      ${cnt?`<div style="font-size:10px;color:var(--gm)">${cnt}t</div>`:''}
-    </th>`;
-  }
-  thead += '</tr></thead>';
+    const cnt=turnos.filter(t=>t.fecha===fs&&t.profesionalId===profFiltro&&t.estado!=='cancelado').length;
 
-  // BODY
-  let tbody = '<tbody>';
-  const skipCol = [0,0,0,0,0]; // filas restantes a saltear por columna (por rowspan de correlativos)
+    const {estadoDia, filas} = construirFilasDia(profFiltro, fs, d);
 
-  const getTs = (fs,hora) => turnos.filter(t=>t.fecha===fs&&t.hora===hora&&t.estado!=='cancelado'&&(profFiltro==='todos'||t.profesionalId===profFiltro));
-
-  horas.forEach((hora,rIdx)=>{
-    tbody += `<tr><td>${hora}</td>`;
-    for(let i=0;i<5;i++){
-      const d=new Date(lunes); d.setDate(lunes.getDate()+i);
-      const fs=fStr(d); const esH=fs===HOY;
-
-      if(skipCol[i]>0){ skipCol[i]--; continue; } // esta celda ya está cubierta por el rowspan de arriba
-
-      const ts=getTs(fs,hora);
-
-      // Determinar si la celda es "no trabaja" (tachada) - solo aplica si hay 1 prof filtrado
-      let noTrabaja = false;
-      let enFranjaSobreConfigurada = false; // hora cubierta por una franja de sobreturno pre-cargada
-      const esFeriadoDia = feriados.has(fs);
-      if(esFeriadoDia){
-        noTrabaja = true;
-      } else if(profFiltro!=='todos'){
-        const p = gProf(profFiltro);
-        if(p && !tieneAus(profFiltro,fs)){
-          const dow = d.getDay();
-          const enFranja = franjasNormales(p,dow).some(h => hora>=h.de && hora<h.a);
-          enFranjaSobreConfigurada = p.hs.some(h => h.d===dow && h.tipo==='sobre' && hora>=h.de && hora<h.a);
-          noTrabaja = !enFranja; // tachado si no hay franja NORMAL, aunque tenga sobreturno configurado
-        } else if(p && tieneAus(profFiltro,fs)){
-          noTrabaja = true;
-        }
-      }
-
-      // ── Detectar turno correlativo: fusionar en una sola celda (rowspan) ──
-      let rowspan = 1;
-      if(ts.length===1 && ts[0].grupoCorrelativo){
-        const grp = ts[0].grupoCorrelativo, prof = ts[0].profesionalId;
-        for(let look=rIdx+1; look<horas.length; look++){
-          const tsN = getTs(fs, horas[look]);
-          if(tsN.length===1 && tsN[0].grupoCorrelativo===grp && tsN[0].profesionalId===prof){
-            rowspan++;
-          } else break;
-        }
-        if(rowspan>1) skipCol[i]=rowspan-1;
-      }
-
-      const bloques=ts.map(t=>{
-        const p=gProf(t.profesionalId);
-        const estado = t.estado || 'espera';
-        const estClass = t.esSobreturno ? 'sobre' : 'est-'+estado;
-        const estLabel = {espera:'',dado:'',presente:'P',asa:'ASA',aca:'ACA'}[estado] || '';
-        const labIco = t.labNombre ? `<span class="tblk-ico" title="Laboratorio: ${t.labNombre}">🧪</span>` : '';
-        const notaIco = t.nota ? `<span class="tblk-ico" title="${t.nota.replace(/"/g,'&quot;')}">📝</span>` : '';
-        const corrIco = (t.grupoCorrelativo&&rowspan>1) ? `<span class="tblk-ico" title="Turno correlativo (${rowspan} horarios)">🔗</span>` : '';
-        const nombreCompleto = t.pacNombre||'—';
-        const profCompleto = p?(p.ape+(p.nom?' '+p.nom:'')):'—';
-        return `<div class="tblk ${estClass}${rowspan>1?' tblk-corr':''}" onclick="verDetalle('${t.id}')" title="${nombreCompleto.replace(/"/g,'&quot;')} · ${profCompleto.replace(/"/g,'&quot;')}">
-          <div class="tn">${nombreCompleto}
-            ${t.esSobreturno?' <small style="background:#E24B4A;color:white;border-radius:2px;padding:0 3px">ST</small>':''}
-            ${estLabel?` <small style="background:rgba(0,0,0,.12);border-radius:2px;padding:0 3px;font-size:9px">${estLabel}</small>`:''}
-            <span class="tblk-icos">${labIco}${notaIco}${corrIco}</span>
-          </div>
-          <div class="ti">${p?(p.ape+(p.nom?' '+p.nom.split(' ')[0]:'')):'—'}</div>
-        </div>`;
+    let cuerpo='';
+    if(estadoDia==='feriado'){
+      cuerpo = `<div class="ag-dc-empty">🎉 Feriado</div>`;
+    } else if(estadoDia==='ausente'){
+      cuerpo = `<div class="ag-dc-empty">Profesional ausente</div>`;
+    } else if(estadoDia==='sin-horario' || !filas.length){
+      cuerpo = `<div class="ag-dc-empty">Sin horarios este día</div>`;
+    } else {
+      const filasHtml = filas.map(fila=>{
+        const r = renderFilaDia(fila, fs);
+        const horaLbl = fila.horaFin ? `${fila.hora}–${fila.horaFin}` : fila.hora;
+        return `<tr class="${r.claseFila}" onclick="${r.click}" title="${r.titulo}">
+          <td class="ag-dt-hora">${horaLbl}</td>
+          <td>${r.contenido}</td>
+        </tr>`;
       }).join('');
-
-      // Verificar si hay bloqueo en este slot
-      const bloqueo = turnos.find(t=>t.profesionalId===(profFiltro!=='todos'?profFiltro:null)&&t.fecha===fs&&t.hora===hora&&t.estado==='bloqueado');
-      const esBloqueado = !!bloqueo && profFiltro!=='todos';
-
-      let cellClass = [esH?'hoy':'', noTrabaja&&!esBloqueado?'no-trabaja':'', noTrabaja&&enFranjaSobreConfigurada?'sobre-disp':'', esBloqueado?'bloqueado':''].filter(Boolean).join(' ');
-      
-      let cellContent = bloques;
-      if(esBloqueado){
-        cellContent = `<div class="blk-lbl">🚫 ${bloqueo.nota||'Bloqueado'}</div>`;
-      } else if(noTrabaja&&enFranjaSobreConfigurada&&!bloques){
-        cellContent = `<div class="blk-lbl" style="color:#B91C1C">🕐 Sobreturno</div>`;
-      }
-
-      // noTrabaja pero clickeable para sobreturno de urgencia / bloqueado clickeable para reactivar
-      let cellClick = '';
-      if(esBloqueado){
-        cellClick = `onclick="celdaClickBloqueado('${bloqueo.id}')"`;
-      } else if(noTrabaja&&enFranjaSobreConfigurada){
-        // Franja de sobreturno pre-cargada por el profesional: se agenda directo, sin confirmar
-        cellClick = `onclick="celdaClick('${fs}','${hora}')"`;
-      } else if(noTrabaja){
-        cellClick = `onclick="celdaClickUrgente('${fs}','${hora}')"`;
-      } else {
-        cellClick = `onclick="celdaClick('${fs}','${hora}')"`;
-      }
-      const rowspanAttr = rowspan>1 ? ` rowspan="${rowspan}"` : '';
-      const titleAttr = esBloqueado?'Clic para reactivar este horario':(noTrabaja&&enFranjaSobreConfigurada?'Sobreturno configurado — clic para agendar':(noTrabaja?'Clic para sobreturno de urgencia':''));
-      tbody+=`<td class="${cellClass}"${rowspanAttr} ${cellClick} title="${titleAttr}">${cellContent}</td>`;
+      cuerpo = `<table class="ag-daytable"><thead><tr><th>Hora</th><th>Paciente</th></tr></thead><tbody>${filasHtml}</tbody></table>`;
     }
-    tbody += '</tr>';
-  });
-  tbody += '</tbody>';
 
-  wrap.innerHTML = `<div class="ag-scroll"><table class="ag-table">${thead}${tbody}</table></div>`;
+    cols += `<div class="ag-daycol${esH?' hoy':''}">
+      <div class="ag-daycol-hdr">
+        <div class="ag-dc-nom">${DIAS_FULL[d.getDay()]}</div>
+        <div class="ag-dc-fecha">${S(d.getDate())}/${S(d.getMonth()+1)}/${d.getFullYear()}</div>
+        ${cnt?`<div class="ag-dc-cnt">${cnt} turno${cnt!==1?'s':''}</div>`:''}
+      </div>
+      ${cuerpo}
+    </div>`;
+  }
+
+  wrap.innerHTML = `<div class="ag-cols-scroll"><div class="ag-cols-wrap">${cols}</div></div>`;
 }
 
 function celdaClick(fecha, hora){
-  abrirNuevoTurno(fecha, hora, profFiltro!=='todos'?profFiltro:null);
+  abrirNuevoTurno(fecha, hora, profFiltro);
 }
 
 // ── TURNOS HOY ────────────────────────────────────────────────
 function renderTurnosHoy(){
   const HOY=hoyStr();
-  const ts=turnos.filter(t=>t.fecha===HOY&&t.estado!=='cancelado'&&(profFiltro==='todos'||t.profesionalId===profFiltro)).sort((a,b)=>a.hora.localeCompare(b.hora));
+  const ts=turnos.filter(t=>t.fecha===HOY&&t.estado!=='cancelado'&&t.profesionalId===profFiltro).sort((a,b)=>a.hora.localeCompare(b.hora));
   const el=document.getElementById('turnosHoyEl');
   document.getElementById('cntHoy').textContent=`${ts.length} turno${ts.length!==1?'s':''}`;
   if(!ts.length){el.innerHTML='<div class="empty">Sin turnos para hoy</div>';return;}
@@ -1439,7 +1482,7 @@ function renderMiniCal(){
   let html=['Lu','Ma','Mi','Ju','Vi','Sá','Do'].map(d=>`<div class="mc-dh">${d}</div>`).join('');
   for(let i=0;i<primerDow;i++) html+='<div></div>';
 
-  const profEsp = profFiltro!=='todos' ? gProf(profFiltro) : null;
+  const profEsp = gProf(profFiltro);
 
   for(let d=1;d<=ultD;d++){
     const fd=new Date(mes.getFullYear(),mes.getMonth(),d);
@@ -1904,7 +1947,7 @@ function renderVistaMedico(){
   `).join('');
   // Tabs días semana
   const lunes=getLunes(offSemana);
-  document.getElementById('docTabs').innerHTML=Array.from({length:6},(_,i)=>{
+  document.getElementById('docTabs').innerHTML=Array.from({length:5},(_,i)=>{
     const d=new Date(lunes); d.setDate(lunes.getDate()+i);
     const fs=fStr(d);
     const trab=p.hs.some(h=>h.d===d.getDay());
@@ -2020,7 +2063,7 @@ function abrirEditProf(id){
   fEl.innerHTML=p.hs.map((h,i)=>`
     <div class="hora-franja">
       <select class="finput" style="width:90px" data-idx="${i}" data-f="d">
-        ${[1,2,3,4,5,6].map(d=>`<option value="${d}"${h.d===d?'selected':''}>${DIAS_C[d]}</option>`).join('')}
+        ${[1,2,3,4,5].map(d=>`<option value="${d}"${h.d===d?'selected':''}>${DIAS_C[d]}</option>`).join('')}
       </select>
       <input type="time" class="finput" style="width:105px" value="${h.de}" data-idx="${i}" data-f="de">
       <span style="color:var(--gm)">a</span>
@@ -2455,7 +2498,7 @@ function abrirBloquearSlot(fecha='', hora='', profId=''){
   const sel = document.getElementById('blkProf');
   sel.innerHTML = profs.map(p=>`<option value="${p.id}">${p.ape}${p.nom?', '+p.nom:''}</option>`).join('');
   if(profId) sel.value=profId;
-  else if(profFiltro!=='todos') sel.value=profFiltro;
+  else if(profFiltro) sel.value=profFiltro;
   document.getElementById('blkFecha').value = fecha||hoyStr();
   document.getElementById('blkHora').value = hora||'';
   document.getElementById('blkMotivo').value = '';
@@ -2546,7 +2589,7 @@ async function guardarBloqueo(){
 
 // ── BOTÓN "TURNO URGENCIA" (acceso directo, sin depender de la celda) ──
 function abrirTurnoUrgente(){
-  abrirNuevoTurno('', '', profFiltro!=='todos'?profFiltro:null);
+  abrirNuevoTurno('', '', profFiltro);
   setTimeout(()=>{
     document.getElementById('nSobre').checked = true;
     urgenteManual = true;
@@ -2575,7 +2618,7 @@ function celdaClickUrgente(fecha, hora){
   if(!confirm(`¿Querés agregar un SOBRETURNO de urgencia el ${labelF(fecha)} a las ${hora} hs?
 (El profesional no trabaja ese día)`)) return;
   // Abrir modal con prof y fecha
-  abrirNuevoTurno(fecha, '', profFiltro!=='todos'?profFiltro:null);
+  abrirNuevoTurno(fecha, '', profFiltro);
   setTimeout(()=>{
     // 1. Tildar sobreturno
     document.getElementById('nSobre').checked = true;
