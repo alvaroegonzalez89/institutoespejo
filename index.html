@@ -360,7 +360,7 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
     </div>
     <nav class="hdr-nav">
       <button class="nav-btn active" id="nb-sec" onclick="switchVista('sec')">Secretaría</button>
-      <button class="nav-btn" id="nb-doc" onclick="switchVista('doc')">Vista médico</button>
+      <button class="nav-btn" id="nb-doc" onclick="switchVista('doc')">Panel Doctores</button>
       <button class="nav-btn" id="nb-pac" onclick="switchVista('pac')">Pacientes</button>
       <button class="nav-btn" id="nb-gest" onclick="switchVista('gest')">Gestión</button>
     </nav>
@@ -496,6 +496,35 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
           <div class="card" style="margin-bottom:.85rem">
             <div class="card-hdr"><span class="card-t">Disponibilidad</span></div>
             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:.85rem" id="docSlotsEl"></div>
+          </div>
+          <div class="card" style="padding:.85rem">
+            <div class="sbd-tit">Calendario</div>
+            <div class="mc-wrap">
+              <div class="mc-nav">
+                <button class="mc-btn" onclick="mcNav(-1)">‹</button>
+                <span style="font-size:12px;font-weight:500" id="mcTitDoc"></span>
+                <button class="mc-btn" onclick="mcNav(1)">›</button>
+              </div>
+              <div class="mc-grid" id="mcGridDoc"></div>
+            </div>
+            <div class="sbd-tit" style="margin-top:.75rem">Próximo mes</div>
+            <div class="mc-wrap">
+              <div class="mc-nav">
+                <button class="mc-btn" onclick="mcNav2(-1)">‹</button>
+                <span style="font-size:12px;font-weight:500" id="mcTitDoc2"></span>
+                <button class="mc-btn" onclick="mcNav2(1)">›</button>
+              </div>
+              <div class="mc-grid" id="mcGridDoc2"></div>
+            </div>
+            <div class="sbd-tit" style="margin-top:.75rem">Mes siguiente</div>
+            <div class="mc-wrap">
+              <div class="mc-nav">
+                <button class="mc-btn" onclick="mcNav3(-1)">‹</button>
+                <span style="font-size:12px;font-weight:500" id="mcTitDoc3"></span>
+                <button class="mc-btn" onclick="mcNav3(1)">›</button>
+              </div>
+              <div class="mc-grid" id="mcGridDoc3"></div>
+            </div>
           </div>
         </div>
       </div>
@@ -859,7 +888,7 @@ let modoMarcarFeriados = false;
 
 let profFiltro   = (PROFS_INIT[0] && PROFS_INIT[0].id) || null; // siempre un profesional puntual — ya no existe la vista "todos"
 let offSemana    = 0;
-let profSelDoc   = null;
+let profSelDoc   = (PROFS_INIT[0] && PROFS_INIT[0].id) || null;
 let diaSelDoc    = hoyStr();
 let pacSelModal  = null;
 let turnoEditId  = null;
@@ -1329,7 +1358,7 @@ function renderAgenda(){
       <div class="ag-daycol-hdr">
         <div class="ag-dc-nom">${DIAS_FULL[d.getDay()]}</div>
         <div class="ag-dc-fecha">${S(d.getDate())}/${S(d.getMonth()+1)}/${d.getFullYear()}</div>
-        ${cnt?`<div class="ag-dc-cnt">${cnt} turno${cnt!==1?'s':''}</div>`:''}
+        <div class="ag-dc-cnt">${cnt} turno${cnt!==1?'s':''}</div>
       </div>
       ${cuerpo}
     </div>`;
@@ -1426,105 +1455,100 @@ function esSemanaSeleccionada(fs){
   return fs >= fStr(lunes) && fs <= fStr(vie);
 }
 
-function renderMiniCal2(){
+function construirGridProf(offset, profIdColor, fnClick){
   const hoy=new Date();
-  const mes=new Date(hoy.getFullYear(),hoy.getMonth()+mcOffset2,1);
+  const mes=new Date(hoy.getFullYear(),hoy.getMonth()+offset,1);
   const ultD=new Date(mes.getFullYear(),mes.getMonth()+1,0).getDate();
   const primerDow=(mes.getDay()+6)%7;
   const HOY=hoyStr();
-  const diasConT=new Set(turnos.map(t=>t.fecha));
-  const tit=document.getElementById('mcTit2'); if(tit) tit.textContent=`${MESES_M[mes.getMonth()]} ${mes.getFullYear()}`;
   let html=['Lu','Ma','Mi','Ju','Vi','Sá','Do'].map(d=>`<div class="mc-dh">${d}</div>`).join('');
   for(let i=0;i<primerDow;i++) html+='<div></div>';
-  for(let d=1;d<=ultD;d++){
-    const dow=new Date(mes.getFullYear(),mes.getMonth(),d).getDay();
-    const fs=`${mes.getFullYear()}-${S(mes.getMonth()+1)}-${S(d)}`;
-    const esH=fs===HOY; const tieneT=diasConT.has(fs);
-    const esFinde=dow===0||dow===6;
-    const esFer=feriados.has(fs);
-    const esSemSel=esSemanaSeleccionada(fs);
-    const clickeable = modoMarcarFeriados ? !esFinde : (!esFinde&&!esFer);
-    const onclick = modoMarcarFeriados ? `toggleFeriado('${fs}')` : (clickeable?`irAFecha('${fs}')`:'');
-    html+=`<div class="mc-d${esH?' hoy':''}${tieneT&&!esH&&!esFer?' tiene':''}${esFinde?' finde':''}${esFer?' feriado':''}${esSemSel?' semana-sel':''}" onclick="${onclick}" title="${esFer?'Feriado':''}">${d}</div>`;
-  }
-  const el=document.getElementById('mcGrid2'); if(el) el.innerHTML=html;
-}
-function renderMiniCal3(){
-  const hoy=new Date();
-  const mes=new Date(hoy.getFullYear(),hoy.getMonth()+mcOffset3,1);
-  const ultD=new Date(mes.getFullYear(),mes.getMonth()+1,0).getDate();
-  const primerDow=(mes.getDay()+6)%7;
-  const HOY=hoyStr();
-  const diasConT=new Set(turnos.map(t=>t.fecha));
-  const tit=document.getElementById('mcTit3'); if(tit) tit.textContent=`${MESES_M[mes.getMonth()]} ${mes.getFullYear()}`;
-  let html=['Lu','Ma','Mi','Ju','Vi','Sá','Do'].map(d=>`<div class="mc-dh">${d}</div>`).join('');
-  for(let i=0;i<primerDow;i++) html+='<div></div>';
-  for(let d=1;d<=ultD;d++){
-    const dow=new Date(mes.getFullYear(),mes.getMonth(),d).getDay();
-    const fs=`${mes.getFullYear()}-${S(mes.getMonth()+1)}-${S(d)}`;
-    const esH=fs===HOY; const tieneT=diasConT.has(fs);
-    const esFinde=dow===0||dow===6;
-    const esFer=feriados.has(fs);
-    const esSemSel=esSemanaSeleccionada(fs);
-    const clickeable = modoMarcarFeriados ? !esFinde : (!esFinde&&!esFer);
-    const onclick = modoMarcarFeriados ? `toggleFeriado('${fs}')` : (clickeable?`irAFecha('${fs}')`:'');
-    html+=`<div class="mc-d${esH?' hoy':''}${tieneT&&!esH&&!esFer?' tiene':''}${esFinde?' finde':''}${esFer?' feriado':''}${esSemSel?' semana-sel':''}" onclick="${onclick}">${d}</div>`;
-  }
-  const el=document.getElementById('mcGrid3'); if(el) el.innerHTML=html;
-}
-function renderMiniCal(){
-  const hoy=new Date();
-  const mes=new Date(hoy.getFullYear(),hoy.getMonth()+mcOffset,1);
-  const ultD=new Date(mes.getFullYear(),mes.getMonth()+1,0).getDate();
-  const primerDow=(mes.getDay()+6)%7;
-  const HOY=hoyStr();
-  document.getElementById('mcTit').textContent=`${MESES_M[mes.getMonth()]} ${mes.getFullYear()}`;
-  let html=['Lu','Ma','Mi','Ju','Vi','Sá','Do'].map(d=>`<div class="mc-dh">${d}</div>`).join('');
-  for(let i=0;i<primerDow;i++) html+='<div></div>';
-
-  const profEsp = gProf(profFiltro);
-
+  const profEsp = gProf(profIdColor);
   for(let d=1;d<=ultD;d++){
     const fd=new Date(mes.getFullYear(),mes.getMonth(),d);
     const fs=`${mes.getFullYear()}-${S(mes.getMonth()+1)}-${S(d)}`;
     const esH=fs===HOY;
     const esFinde=fd.getDay()===0||fd.getDay()===6;
-
     let claseExtra='';
     let clickeable = !esFinde;
-
     if(profEsp){
-      // Vista filtrada por profesional: marcar días que atiende / ausencia
       const trabaja = franjasNormales(profEsp, fd.getDay()).length>0;
-      const ausente = tieneAus(profFiltro, fs);
+      const ausente = tieneAus(profIdColor, fs);
       if(ausente){ claseExtra=' aus-prof'; clickeable=false; }
       else if(!trabaja){ claseExtra=' no-atiende'; clickeable=false; }
       else {
-        const tsDia = turnos.filter(t=>t.profesionalId===profFiltro&&t.fecha===fs&&t.estado!=='cancelado');
+        const tsDia = turnos.filter(t=>t.profesionalId===profIdColor&&t.fecha===fs&&t.estado!=='cancelado');
         if(tsDia.length){
           const hayEspera = tsDia.some(t=>t.estado==='espera');
           claseExtra = hayEspera ? ' tiene-espera' : ' tiene-dado';
         }
       }
     } else {
-      // Vista "todos": verde si hay turnos dados ese día
       const tsDia = turnos.filter(t=>t.fecha===fs&&t.estado!=='cancelado');
       if(tsDia.length){
         const hayEspera = tsDia.some(t=>t.estado==='espera');
         claseExtra = hayEspera ? ' tiene-espera' : ' tiene-dado';
       }
     }
-
     const esFer = feriados.has(fs);
     if(esFer){ claseExtra=' feriado'; clickeable=false; }
     const esSemSel = esSemanaSeleccionada(fs);
     if(esSemSel) claseExtra+=' semana-sel';
-
-    const onclick = modoMarcarFeriados ? (!esFinde?`toggleFeriado('${fs}')`:'') : (clickeable?`irAFecha('${fs}')`:'');
-    const tit = esFer ? 'Feriado' : (profEsp&&tieneAus(profFiltro,fs)?'Profesional ausente':'');
+    const onclick = modoMarcarFeriados ? (!esFinde?`toggleFeriado('${fs}')`:'') : (clickeable?`${fnClick}('${fs}')`:'');
+    const tit = esFer ? 'Feriado' : (profEsp&&tieneAus(profIdColor,fs)?'Profesional ausente':'');
     html+=`<div class="mc-d${esH?' hoy':''}${esFinde?' finde':''}${claseExtra}" onclick="${onclick}" title="${tit}">${d}</div>`;
   }
-  document.getElementById('mcGrid').innerHTML=html;
+  return {tit:`${MESES_M[mes.getMonth()]} ${mes.getFullYear()}`, html};
+}
+
+function construirGridSimple(offset, fnClick){
+  const hoy=new Date();
+  const mes=new Date(hoy.getFullYear(),hoy.getMonth()+offset,1);
+  const ultD=new Date(mes.getFullYear(),mes.getMonth()+1,0).getDate();
+  const primerDow=(mes.getDay()+6)%7;
+  const HOY=hoyStr();
+  const diasConT=new Set(turnos.map(t=>t.fecha));
+  let html=['Lu','Ma','Mi','Ju','Vi','Sá','Do'].map(d=>`<div class="mc-dh">${d}</div>`).join('');
+  for(let i=0;i<primerDow;i++) html+='<div></div>';
+  for(let d=1;d<=ultD;d++){
+    const dow=new Date(mes.getFullYear(),mes.getMonth(),d).getDay();
+    const fs=`${mes.getFullYear()}-${S(mes.getMonth()+1)}-${S(d)}`;
+    const esH=fs===HOY; const tieneT=diasConT.has(fs);
+    const esFinde=dow===0||dow===6;
+    const esFer=feriados.has(fs);
+    const esSemSel=esSemanaSeleccionada(fs);
+    const clickeable = modoMarcarFeriados ? !esFinde : (!esFinde&&!esFer);
+    const onclick = modoMarcarFeriados ? `toggleFeriado('${fs}')` : (clickeable?`${fnClick}('${fs}')`:'');
+    html+=`<div class="mc-d${esH?' hoy':''}${tieneT&&!esH&&!esFer?' tiene':''}${esFinde?' finde':''}${esFer?' feriado':''}${esSemSel?' semana-sel':''}" onclick="${onclick}" title="${esFer?'Feriado':''}">${d}</div>`;
+  }
+  return {tit:`${MESES_M[mes.getMonth()]} ${mes.getFullYear()}`, html};
+}
+
+function renderMiniCal2(){
+  const g=construirGridSimple(mcOffset2,'irAFecha');
+  const t=document.getElementById('mcTit2'); if(t) t.textContent=g.tit;
+  const e=document.getElementById('mcGrid2'); if(e) e.innerHTML=g.html;
+  const gd=construirGridSimple(mcOffset2,'irAFechaDoc');
+  const td=document.getElementById('mcTitDoc2'); if(td) td.textContent=gd.tit;
+  const ed=document.getElementById('mcGridDoc2'); if(ed) ed.innerHTML=gd.html;
+}
+function renderMiniCal3(){
+  const g=construirGridSimple(mcOffset3,'irAFecha');
+  const t=document.getElementById('mcTit3'); if(t) t.textContent=g.tit;
+  const e=document.getElementById('mcGrid3'); if(e) e.innerHTML=g.html;
+  const gd=construirGridSimple(mcOffset3,'irAFechaDoc');
+  const td=document.getElementById('mcTitDoc3'); if(td) td.textContent=gd.tit;
+  const ed=document.getElementById('mcGridDoc3'); if(ed) ed.innerHTML=gd.html;
+}
+function renderMiniCal(){
+  const g1 = construirGridProf(mcOffset, profFiltro, 'irAFecha');
+  const t1 = document.getElementById('mcTit'); if(t1) t1.textContent=g1.tit;
+  const e1 = document.getElementById('mcGrid'); if(e1) e1.innerHTML=g1.html;
+
+  const g1d = construirGridProf(mcOffset, profSelDoc, 'irAFechaDoc');
+  const t1d = document.getElementById('mcTitDoc'); if(t1d) t1d.textContent=g1d.tit;
+  const e1d = document.getElementById('mcGridDoc'); if(e1d) e1d.innerHTML=g1d.html;
+
   renderMiniCal2();
   renderMiniCal3();
 }
@@ -1535,6 +1559,18 @@ function irAFecha(f){
   const base=getLunes(0);
   offSemana=Math.round((lunes-base)/(7*24*3600*1000));
   renderAgenda();
+  renderMiniCal();
+}
+// Igual que irAFecha, pero para cuando el clic viene del calendario de la
+// vista Panel Doctores: además mueve el día seleccionado del profesional.
+function irAFechaDoc(f){
+  const d=new Date(f+'T00:00:00');
+  const dow=(d.getDay()+6)%7;
+  const lunes=new Date(d); lunes.setDate(d.getDate()-dow);
+  const base=getLunes(0);
+  offSemana=Math.round((lunes-base)/(7*24*3600*1000));
+  diaSelDoc=f;
+  renderVistaMedico();
   renderMiniCal();
 }
 
@@ -1928,7 +1964,7 @@ function switchVista(v){
   const el=document.getElementById(map[v]); if(el) el.style.display='flex';
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   const nb=document.getElementById('nb-'+v); if(nb) nb.classList.add('active');
-  if(v==='doc'){ if(!profSelDoc) profSelDoc=profs[0].id; renderVistaMedico(); }
+  if(v==='doc'){ if(!profSelDoc) profSelDoc=profs[0].id; renderVistaMedico(); renderMiniCal(); }
   if(v==='gest') renderGestion();
   if(v==='pac') renderPacientes();
 }
@@ -2026,7 +2062,7 @@ function renderVistaMedico(){
   sEl.innerHTML=slots.map(s=>`<div style="padding:6px 3px;border-radius:7px;text-align:center;font-size:11.5px;border:1.5px solid ${s.libre?p.color:p.bor||'#D3D1C7'};background:${s.libre?p.light:'var(--gc)'};color:${s.libre?p.color:'var(--bor)'};${!s.libre?'text-decoration:line-through':''}">${s.hora}</div>`).join('');
 }
 
-function selDoc(id){ profSelDoc=id; diaSelDoc=hoyStr(); renderVistaMedico(); }
+function selDoc(id){ profSelDoc=id; diaSelDoc=hoyStr(); renderVistaMedico(); renderMiniCal(); }
 function selDiaDoc(f){ diaSelDoc=f; renderVistaMedico(); }
 
 // ── GESTIÓN ───────────────────────────────────────────────────
