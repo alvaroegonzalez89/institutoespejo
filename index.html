@@ -181,10 +181,10 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
 .ag-dc-cnt{font-size:9.5px;color:var(--gm);margin-top:1px}
 .ag-daytable{width:100%;border-collapse:collapse;table-layout:fixed}
 .ag-daytable th{font-size:9.5px;color:var(--gm);text-transform:uppercase;letter-spacing:.4px;font-weight:600;text-align:left;padding:5px 6px;border-bottom:1px solid var(--bor);background:var(--gc)}
-.ag-daytable th:first-child{width:46px}
-.ag-daytable td{padding:5px 6px;border-bottom:1px solid var(--bor);font-size:11.5px;vertical-align:top;cursor:pointer;transition:background .1s}
+.ag-daytable th:first-child{width:56px}
+.ag-daytable td{padding:9px 7px;border-bottom:1px solid var(--bor);font-size:11.5px;vertical-align:top;cursor:pointer;transition:background .1s}
 .ag-daytable tr:last-child td{border-bottom:none}
-.ag-dt-hora{font-size:11px;color:var(--azul);font-weight:600;white-space:nowrap}
+.ag-dt-hora{font-size:11px;color:var(--azul);font-weight:600;line-height:1.35}
 .ag-daytable tr:hover td{background:rgba(26,78,122,.04)}
 .ag-dt-libre{color:var(--bor);font-style:italic}
 .ag-daytable tr.ocupado td{background:rgba(0,0,0,.015)}
@@ -201,8 +201,8 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
 .ag-daytable tr.sobre-disp:hover td{background:repeating-linear-gradient(45deg,#FCE0E0,#FCE0E0 6px,#F9C9C9 6px,#F9C9C9 12px)}
 .ag-daytable tr.bloqueado td{background:repeating-linear-gradient(135deg,#fef3f3,#fef3f3 5px,#fde8e8 5px,#fde8e8 10px);cursor:pointer}
 .ag-daytable tr.bloqueado .ag-dt-hora{color:#B91C1C}
-.ag-dt-nom{font-weight:500;display:flex;align-items:center;gap:4px;flex-wrap:wrap}
-.ag-dt-det{font-size:10px;color:var(--gm);margin-top:1px}
+.ag-dt-nom{font-weight:500;display:flex;align-items:center;gap:4px;flex-wrap:wrap;line-height:1.4}
+.ag-dt-det{font-size:10px;color:var(--gm);margin-top:2px}
 .ag-dc-empty{padding:1.5rem .75rem;text-align:center;font-size:11.5px;color:var(--gm)}
 
 /* TOOLBAR */
@@ -1316,7 +1316,7 @@ function renderAgenda(){
     } else {
       const filasHtml = filas.map(fila=>{
         const r = renderFilaDia(fila, fs);
-        const horaLbl = fila.horaFin ? `${fila.hora}–${fila.horaFin}` : fila.hora;
+        const horaLbl = fila.horaFin ? `${fila.hora}<br>${fila.horaFin}` : fila.hora;
         return `<tr class="${r.claseFila}" onclick="${r.click}" title="${r.titulo}">
           <td class="ag-dt-hora">${horaLbl}</td>
           <td>${r.contenido}</td>
