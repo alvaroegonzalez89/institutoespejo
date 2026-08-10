@@ -168,7 +168,7 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
 .tblk-ico{font-size:10px;cursor:help}
 
 /* AGENDA POR PROFESIONAL — columnas lado a lado (estilo Bilog) */
-.ag-cols-scroll{overflow-y:auto;max-height:560px}
+.ag-cols-scroll{overflow-y:auto;max-height:min(72vh,780px)}
 .ag-cols-wrap{display:grid;grid-template-columns:repeat(5,1fr);gap:0}
 .ag-daycol{border-right:1px solid var(--bor);display:flex;flex-direction:column;min-width:0}
 .ag-daycol:last-child{border-right:none}
@@ -1226,12 +1226,16 @@ function construirFilasDia(profId, fs, d){
   const p = gProf(profId);
   if(!p) return {estadoDia:'sin-prof', filas:[]};
 
-  // Si el día es feriado pero YA había turnos reales cargados desde antes de
-  // marcarlo como tal, no los escondemos: se muestran igual con un aviso,
-  // para que no queden pacientes "invisibles" sin que nadie los reprograme.
+  // Si el día es feriado pero YA había turnos de PACIENTES reales cargados
+  // desde antes de marcarlo como tal, no los escondemos: se muestran igual
+  // con un aviso, para que no queden pacientes "invisibles" sin reprogramar.
+  // Las anulaciones manuales sueltas (estado 'bloqueado' — alguien tildó
+  // horario por horario a mano) NO cuentan para esto: ya quedan cubiertas
+  // por el feriado y no tiene sentido mostrarlas ni alarmar por ellas.
   const esFeriado = feriados.has(fs);
-  const hayTurnosPrevios = turnos.some(t=>t.profesionalId===profId&&t.fecha===fs&&t.estado!=='cancelado');
-  if(esFeriado && !hayTurnosPrevios) return {estadoDia:'feriado', filas:[]};
+  const esValido = t => t.estado!=='cancelado' && !(esFeriado && t.estado==='bloqueado');
+  const hayTurnosReales = turnos.some(t=>t.profesionalId===profId&&t.fecha===fs&&esValido(t));
+  if(esFeriado && !hayTurnosReales) return {estadoDia:'feriado', filas:[]};
   if(!esFeriado && tieneAus(profId, fs)) return {estadoDia:'ausente', filas:[]};
 
   const dow = d.getDay();
@@ -1241,11 +1245,11 @@ function construirFilasDia(profId, fs, d){
   // sobreturno de urgencia fuera de esas franjas, o turnos previos a un feriado).
   const horasSet = new Set();
   generarSlots(profId, fs).forEach(s=>horasSet.add(s.hora));
-  turnos.filter(t=>t.profesionalId===profId&&t.fecha===fs&&t.estado!=='cancelado').forEach(t=>horasSet.add(t.hora));
+  turnos.filter(t=>t.profesionalId===profId&&t.fecha===fs&&esValido(t)).forEach(t=>horasSet.add(t.hora));
   const horas=[...horasSet].sort();
   if(!horas.length) return {estadoDia:'sin-horario', filas:[]};
 
-  const getTs = (hora) => turnos.filter(t=>t.profesionalId===profId&&t.fecha===fs&&t.hora===hora&&t.estado!=='cancelado');
+  const getTs = (hora) => turnos.filter(t=>t.profesionalId===profId&&t.fecha===fs&&t.hora===hora&&esValido(t));
 
   const filas=[];
   let skip=0;
@@ -1271,7 +1275,9 @@ function construirFilasDia(profId, fs, d){
       if(rango>1) horaFin = addMins(ultima, p.dur||30);
     }
 
-    const bloqueo = turnos.find(t=>t.profesionalId===profId&&t.fecha===fs&&t.hora===hora&&t.estado==='bloqueado');
+    // En feriado ya excluimos los bloqueos sueltos de "ts"/"horas" arriba,
+    // así que este chequeo solo puede disparar en un día normal.
+    const bloqueo = esFeriado ? null : turnos.find(t=>t.profesionalId===profId&&t.fecha===fs&&t.hora===hora&&t.estado==='bloqueado');
     const esBloqueado = !!bloqueo;
 
     filas.push({hora, horaFin, ts, rango, noTrabaja, enFranjaSobreConfigurada, esBloqueado, bloqueo});
@@ -1856,7 +1862,12 @@ async function guardarTurno(){
 function verDetalle(id){
   const t=turnos.find(x=>x.id===id); if(!t) return;
   const p=gProf(t.profesionalId);
-  const historial=turnos.filter(x=>x.pacienteId===t.pacienteId&&x.id!==id&&x.estado!=='cancelado').sort((a,b)=>b.fecha.localeCompare(a.fecha)).slice(0,5);
+  // Historial del paciente: solo tiene sentido si el turno tiene un
+  // pacienteId real. Los turnos "bloqueado" (anulaciones manuales de horario)
+  // se guardan con pacienteId:null — si no filtráramos esto, "null===null"
+  // haría que el historial mezclara anulaciones de cualquier profesional o
+  // fecha como si fueran visitas de un mismo paciente.
+  const historial = t.pacienteId ? turnos.filter(x=>x.pacienteId===t.pacienteId&&x.id!==id&&x.estado!=='cancelado'&&x.estado!=='bloqueado').sort((a,b)=>b.fecha.localeCompare(a.fecha)).slice(0,5) : [];
   const ini=(t.pacNombre||'').split(' ').map(w=>w[0]).slice(0,2).join('');
   document.getElementById('detTit').textContent=`Turno · ${t.pacNombre||'—'}`;
   document.getElementById('detBody').innerHTML=`
