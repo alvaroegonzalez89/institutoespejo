@@ -204,6 +204,7 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
 .ag-dt-nom{font-weight:500;display:flex;align-items:center;gap:4px;flex-wrap:wrap;line-height:1.25}
 .ag-dt-det{font-size:10px;color:var(--gm);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ag-dc-empty{padding:1.5rem .75rem;text-align:center;font-size:11.5px;color:var(--gm)}
+.ag-dc-aviso{background:#FEE2E2;color:#B91C1C;font-size:10.5px;font-weight:500;padding:6px 8px;line-height:1.4;border-bottom:1px solid #FCA5A5}
 
 /* TOOLBAR */
 .toolbar{display:flex;align-items:center;gap:8px;margin-bottom:.85rem;flex-wrap:wrap}
@@ -1224,14 +1225,20 @@ const DIAS_FULL = ['domingo','lunes','martes','miércoles','jueves','viernes','s
 function construirFilasDia(profId, fs, d){
   const p = gProf(profId);
   if(!p) return {estadoDia:'sin-prof', filas:[]};
-  if(feriados.has(fs)) return {estadoDia:'feriado', filas:[]};
-  if(tieneAus(profId, fs)) return {estadoDia:'ausente', filas:[]};
+
+  // Si el día es feriado pero YA había turnos reales cargados desde antes de
+  // marcarlo como tal, no los escondemos: se muestran igual con un aviso,
+  // para que no queden pacientes "invisibles" sin que nadie los reprograme.
+  const esFeriado = feriados.has(fs);
+  const hayTurnosPrevios = turnos.some(t=>t.profesionalId===profId&&t.fecha===fs&&t.estado!=='cancelado');
+  if(esFeriado && !hayTurnosPrevios) return {estadoDia:'feriado', filas:[]};
+  if(!esFeriado && tieneAus(profId, fs)) return {estadoDia:'ausente', filas:[]};
 
   const dow = d.getDay();
 
   // Horas a mostrar: las que salen de generarSlots (franjas normales + sobreturno
   // configurado) más las de cualquier turno ya agendado ese día (por si quedó un
-  // sobreturno de urgencia fuera de esas franjas).
+  // sobreturno de urgencia fuera de esas franjas, o turnos previos a un feriado).
   const horasSet = new Set();
   generarSlots(profId, fs).forEach(s=>horasSet.add(s.hora));
   turnos.filter(t=>t.profesionalId===profId&&t.fecha===fs&&t.estado!=='cancelado').forEach(t=>horasSet.add(t.hora));
@@ -1248,7 +1255,7 @@ function construirFilasDia(profId, fs, d){
 
     const enFranja = franjasNormales(p,dow).some(h=>hora>=h.de && hora<h.a);
     const enFranjaSobreConfigurada = p.hs.some(h=>h.d===dow && h.tipo==='sobre' && hora>=h.de && hora<h.a);
-    const noTrabaja = !enFranja;
+    const noTrabaja = esFeriado ? true : !enFranja;
 
     // Fusionar turnos correlativos consecutivos en una sola fila (mismo criterio que antes, sin rowspan de tabla)
     let horaFin = null, rango = 1;
@@ -1269,7 +1276,7 @@ function construirFilasDia(profId, fs, d){
 
     filas.push({hora, horaFin, ts, rango, noTrabaja, enFranjaSobreConfigurada, esBloqueado, bloqueo});
   });
-  return {estadoDia:'ok', filas};
+  return {estadoDia: esFeriado?'feriado-con-turnos':'ok', filas};
 }
 
 function renderFilaDia(fila, fs){
@@ -1336,6 +1343,7 @@ function renderAgenda(){
     const {estadoDia, filas} = construirFilasDia(profFiltro, fs, d);
 
     let cuerpo='';
+    let aviso='';
     if(estadoDia==='feriado'){
       cuerpo = `<div class="ag-dc-empty">🎉 Feriado</div>`;
     } else if(estadoDia==='ausente'){
@@ -1343,6 +1351,9 @@ function renderAgenda(){
     } else if(estadoDia==='sin-horario' || !filas.length){
       cuerpo = `<div class="ag-dc-empty">Sin horarios este día</div>`;
     } else {
+      if(estadoDia==='feriado-con-turnos'){
+        aviso = `<div class="ag-dc-aviso">🎉 Feriado — pero hay ${filas.length} turno${filas.length!==1?'s':''} ya agendado${filas.length!==1?'s':''} desde antes. Reprogramalos.</div>`;
+      }
       const filasHtml = filas.map(fila=>{
         const r = renderFilaDia(fila, fs);
         const horaLbl = fila.horaFin ? `${fila.hora}<br>${fila.horaFin}` : fila.hora;
@@ -1351,7 +1362,7 @@ function renderAgenda(){
           <td>${r.contenido}</td>
         </tr>`;
       }).join('');
-      cuerpo = `<table class="ag-daytable"><thead><tr><th>Hora</th><th>Paciente</th></tr></thead><tbody>${filasHtml}</tbody></table>`;
+      cuerpo = `${aviso}<table class="ag-daytable"><thead><tr><th>Hora</th><th>Paciente</th></tr></thead><tbody>${filasHtml}</tbody></table>`;
     }
 
     cols += `<div class="ag-daycol${esH?' hoy':''}">
