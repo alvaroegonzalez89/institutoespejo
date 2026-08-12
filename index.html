@@ -371,18 +371,6 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
     </div>
   </header>
 
-  <!-- RESUMEN BAR -->
-  <div class="res-bar" id="resBar">
-    <div class="rb-item" style="background:var(--azulp);border-color:rgba(26,78,122,.15)"><span class="rb-val" id="rbHoy" style="color:var(--azul)">0</span><span class="rb-lbl">Turnos hoy</span></div>
-    <div class="rb-item" style="background:var(--ambarp);border-color:rgba(186,117,23,.2)"><span class="rb-val" id="rbEspera" style="color:var(--ambar)">0</span><span class="rb-lbl">En espera</span></div>
-    <div class="rb-item" style="background:var(--verdep);border-color:rgba(29,158,117,.2)"><span class="rb-val" id="rbDado" style="color:var(--verde)">0</span><span class="rb-lbl">Dados</span></div>
-    <div class="rb-item" style="background:#d1fae5;border-color:rgba(6,95,70,.15)"><span class="rb-val" id="rbPres" style="color:#065f46">0</span><span class="rb-lbl">Presentes</span></div>
-    <div class="rb-item" style="background:var(--rojop);border-color:rgba(226,75,74,.2)"><span class="rb-val" id="rbAsa" style="color:var(--rojo)">0</span><span class="rb-lbl">Aus. s/aviso</span></div>
-    <div class="rb-item" style="background:#FFEAD1;border-color:rgba(186,117,23,.3)"><span class="rb-val" id="rbAca" style="color:#9A5B0C">0</span><span class="rb-lbl">Aus. c/aviso</span></div>
-    <div class="rb-item" style="background:#FFE4E4;border-color:rgba(226,75,74,.3)"><span class="rb-val" id="rbSobre" style="color:var(--rojo)">0</span><span class="rb-lbl">Sobreturnos</span></div>
-    <div class="rb-item" style="background:#dcf8c6;border-color:rgba(37,211,102,.3);margin-left:auto"><span class="rb-val" id="rbMan" style="color:#0F6E56">0</span><span class="rb-lbl">Mañana</span></div>
-  </div>
-
   <!-- ══ SECRETARÍA ══ -->
   <div id="vSec" class="vista">
     <div class="sec-layout" id="secLayout">
@@ -1225,6 +1213,7 @@ function cambiarSem(d){ offSemana+=d; renderAgenda(); renderMiniCal(); }
 function irHoy(){ offSemana=0; renderAgenda(); renderMiniCal(); }
 
 const DIAS_FULL = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+const DIAS_ABR  = ['do','lu','ma','mi','ju','vi','sá'];
 
 // Arma las filas (Hora | Paciente) de UN día para el profesional seleccionado.
 // Reutiliza exactamente la misma lógica de disponibilidad/sobreturnos/bloqueos
@@ -1322,8 +1311,7 @@ function renderFilaDia(fila, fs){
       ${t.esSobreturno?' <small style="background:#E24B4A;color:white;border-radius:2px;padding:0 3px;font-size:9px">ST</small>':''}
       ${estLabel?` <small style="background:rgba(0,0,0,.12);border-radius:2px;padding:0 3px;font-size:9px">${estLabel}</small>`:''}
       <span class="tblk-icos">${labIco}${notaIco}${corrIco}</span>
-    </div>
-    <div class="ag-dt-det">${t.servicio||''}</div>`;
+    </div>`;
   }).join('');
   const estadoPrincipal = fila.ts[0].estado || 'espera';
   const claseFila = 'ocupado est-'+estadoPrincipal + (fila.ts[0].esSobreturno?' sobre':'');
@@ -1380,9 +1368,8 @@ function renderAgenda(){
 
     cols += `<div class="ag-daycol${esH?' hoy':''}">
       <div class="ag-daycol-hdr">
-        <div class="ag-dc-nom">${DIAS_FULL[d.getDay()]}</div>
+        <div class="ag-dc-nom">${DIAS_ABR[d.getDay()]}</div>
         <div class="ag-dc-fecha">${S(d.getDate())}/${S(d.getMonth()+1)}/${d.getFullYear()}</div>
-        <div class="ag-dc-cnt">${cnt} turno${cnt!==1?'s':''}</div>
       </div>
       ${cuerpo}
     </div>`;
@@ -2120,7 +2107,7 @@ function renderVistaMedico(){
         <div class="vivo-hora" style="color:${p.color}">${horaLabel}</div>
         <div style="flex:1">
           <div class="vivo-nom">${t.pacNombre||'—'} ${esCorrido?`<span class="tblk-ico" title="Turno correlativo (${grupo.length} horarios)">🔗</span>`:''} ${t.esSobreturno?'<small style="background:#E24B4A;color:white;border-radius:3px;padding:0 4px;font-size:9px">ST</small>':''} ${t.labNombre?`<span title="Lab: ${t.labNombre}" style="font-size:12px">🧪</span>`:''}</div>
-          <div class="vivo-det">${t.servicio||'—'} · 📱 ${t.pacTel||'—'}</div>
+          <div class="vivo-det">📱 ${t.pacTel||'—'}</div>
           ${t.nota?`<div style="font-size:11px;color:var(--ambar);margin-top:2px;font-style:italic">⚠️ ${t.nota}</div>`:''}
         </div>
         <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
