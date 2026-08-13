@@ -1929,7 +1929,16 @@ function verDetalle(id){
       <label class="flbl">Nota clínica</label>
       <textarea class="finput" id="detNota" style="min-height:55px;resize:vertical;margin-top:4px">${t.nota||''}</textarea>
     </div>
-    ${t.labNombre?`<div style="background:#F3E8FF;border-radius:var(--r);padding:.7rem .9rem;margin-top:.75rem;font-size:13px;border-left:3px solid #7c3aed">🧪 <strong>Laboratorio:</strong> ${t.labNombre}</div>`:''}
+    <div class="fg" style="margin-top:.75rem">
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-bottom:6px">
+        <input type="checkbox" id="detTieneLab" onchange="toggleLabSelectDet()" ${t.labNombre?'checked':''}>
+        <span>🧪 <strong>Va a laboratorio</strong></span>
+      </label>
+      <div id="detLabSelectWrap" class="${t.labNombre?'':'hidden'}">
+        <select class="fselect" id="detLab"></select>
+        <button type="button" class="btn-s" style="font-size:11px;margin-top:5px;padding:4px 10px" onclick="agregarLabNuevo('detLab')">+ Agregar otro laboratorio</button>
+      </div>
+    </div>
     <div style="margin-top:.75rem">
       <label class="flbl">Estado de asistencia</label>
       <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
@@ -1953,6 +1962,7 @@ function verDetalle(id){
       return `<a href="https://wa.me/549${t.pacTel}?text=${msg}" target="_blank" class="btn-wa">WA</a>`;
     })():''}
   `;
+  if(t.labNombre){ poblarLabSelect('detLab'); document.getElementById('detLab').value=t.labNombre; }
   abrirModal('mDet');
 }
 
@@ -1974,8 +1984,10 @@ async function cancelarTurno(id){
 
 async function guardarDetalle(id){
   const nota=document.getElementById('detNota').value.trim();
-  await db.collection('turnos').doc(id).update({nota});
-  toast('Nota guardada ✓','ok');
+  const tieneLab = document.getElementById('detTieneLab').checked;
+  const labNombre = tieneLab ? document.getElementById('detLab').value : '';
+  await db.collection('turnos').doc(id).update({nota, labNombre});
+  toast('Guardado ✓','ok');
   cerrarModal('mDet');
 }
 
@@ -2758,18 +2770,24 @@ function toggleLabSelect(){
   const checked = document.getElementById('nTieneLab').checked;
   const wrap = document.getElementById('labSelectWrap');
   wrap.classList.toggle('hidden', !checked);
-  if(checked) poblarLabSelect();
+  if(checked) poblarLabSelect('nLab');
 }
-function poblarLabSelect(){
-  const sel = document.getElementById('nLab');
+function toggleLabSelectDet(){
+  const checked = document.getElementById('detTieneLab').checked;
+  const wrap = document.getElementById('detLabSelectWrap');
+  wrap.classList.toggle('hidden', !checked);
+  if(checked) poblarLabSelect('detLab');
+}
+function poblarLabSelect(selId='nLab'){
+  const sel = document.getElementById(selId);
   sel.innerHTML = LABORATORIOS.map(l=>`<option value="${l}">${l}</option>`).join('');
 }
-function agregarLabNuevo(){
+function agregarLabNuevo(selId='nLab'){
   const nuevo = prompt('Nombre del nuevo laboratorio:');
   if(nuevo && nuevo.trim()){
     LABORATORIOS.push(nuevo.trim());
-    poblarLabSelect();
-    document.getElementById('nLab').value = nuevo.trim();
+    poblarLabSelect(selId);
+    document.getElementById(selId).value = nuevo.trim();
   }
 }
 
