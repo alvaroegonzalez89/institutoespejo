@@ -164,8 +164,8 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
 .tblk.est-aca{background:#FFEAD1;border-left-color:#BA7517}
 .tn{font-weight:500;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:3px}
 .ti{font-size:10px;opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tblk-icos{display:flex;gap:2px;align-items:center;flex-shrink:0}
-.tblk-ico{font-size:10px;cursor:help}
+.tblk-icos{display:flex;gap:4px;align-items:center;flex-shrink:0}
+.tblk-ico{font-size:15px;cursor:help;line-height:1}
 
 /* AGENDA POR PROFESIONAL — columnas lado a lado (estilo Bilog) */
 .ag-cols-scroll{overflow-y:auto;max-height:min(72vh,780px)}
@@ -1308,8 +1308,8 @@ function renderFilaDia(fila, fs){
     const corrIco = (t.grupoCorrelativo && fila.rango>1) ? `<span class="tblk-ico" title="Turno correlativo (${fila.rango} horarios)">🔗</span>` : '';
     return `<div class="ag-dt-nom" onclick="event.stopPropagation();verDetalle('${t.id}')" title="${(t.pacNombre||'').replace(/"/g,'&quot;')}">
       ${t.pacNombre||'—'}
-      ${t.esSobreturno?' <small style="background:#E24B4A;color:white;border-radius:2px;padding:0 3px;font-size:9px">ST</small>':''}
-      ${estLabel?` <small style="background:rgba(0,0,0,.12);border-radius:2px;padding:0 3px;font-size:9px">${estLabel}</small>`:''}
+      ${t.esSobreturno?' <small style="background:#E24B4A;color:white;border-radius:3px;padding:1px 5px;font-size:11px;font-weight:600">ST</small>':''}
+      ${estLabel?` <small style="background:rgba(0,0,0,.12);border-radius:3px;padding:1px 5px;font-size:11px;font-weight:600">${estLabel}</small>`:''}
       <span class="tblk-icos">${labIco}${notaIco}${corrIco}</span>
     </div>`;
   }).join('');
@@ -2118,7 +2118,7 @@ function renderVistaMedico(){
       <div class="vivo-row${t.esSobreturno?' sobre':''}" onclick="verDetalle('${t.id}')">
         <div class="vivo-hora" style="color:${p.color}">${horaLabel}</div>
         <div style="flex:1">
-          <div class="vivo-nom">${t.pacNombre||'—'} ${esCorrido?`<span class="tblk-ico" title="Turno correlativo (${grupo.length} horarios)">🔗</span>`:''} ${t.esSobreturno?'<small style="background:#E24B4A;color:white;border-radius:3px;padding:0 4px;font-size:9px">ST</small>':''} ${t.labNombre?`<span title="Lab: ${t.labNombre}" style="font-size:12px">🧪</span>`:''}</div>
+          <div class="vivo-nom">${t.pacNombre||'—'} ${esCorrido?`<span class="tblk-ico" title="Turno correlativo (${grupo.length} horarios)">🔗</span>`:''} ${t.esSobreturno?'<small style="background:#E24B4A;color:white;border-radius:3px;padding:1px 5px;font-size:11px;font-weight:600">ST</small>':''} ${t.labNombre?`<span class="tblk-ico" title="Lab: ${t.labNombre}">🧪</span>`:''}</div>
           <div class="vivo-det">📱 ${t.pacTel||'—'}</div>
           ${t.nota?`<div style="font-size:11px;color:var(--ambar);margin-top:2px;font-style:italic">⚠️ ${t.nota}</div>`:''}
         </div>
