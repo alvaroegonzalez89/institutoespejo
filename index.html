@@ -1791,9 +1791,10 @@ async function guardarTurno(){
     if(!hora){toast('Seleccioná un horario','err');return;}
     if(!nom&&!ape){toast('Ingresá el nombre del paciente','err');return;}
 
-    // Verificar duplicado (salvo sobreturno)
+    // Verificar duplicado (salvo sobreturno) — excluyendo el propio turno
+    // cuando se está editando, si no, siempre "chocaba contra sí mismo".
     if(!esSob){
-      const col=turnos.find(t=>t.profesionalId===profId&&t.fecha===fecha&&t.hora===hora&&t.estado!=='cancelado');
+      const col=turnos.find(t=>t.profesionalId===profId&&t.fecha===fecha&&t.hora===hora&&t.estado!=='cancelado'&&t.id!==turnoEditId);
       if(col){toast('Ese horario ya está ocupado. Marcá sobreturno si querés agregarlo igual.','err');return;}
     }
 
