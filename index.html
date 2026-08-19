@@ -597,17 +597,17 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
         </div>
       </div>
       <!-- TURNOS CORRELATIVOS -->
-      <div id="corrSlotsSec" class="hidden">
+      <div style="margin-bottom:.75rem">
+        <button type="button" class="btn-s" id="btnCorr" style="width:100%;justify-content:center;font-size:12.5px;color:var(--azul);border-color:var(--azulp)" onclick="toggleCorrelativos()" disabled>
+          🔗 Agregar turnos correlativos
+        </button>
+      </div>
+      <div id="corrSlotsSec" class="hidden" style="margin-bottom:.75rem">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
           <label class="flbl" style="margin:0">🔗 Turnos correlativos — seleccioná los slots siguientes</label>
           <button type="button" class="btn-s" style="font-size:11px;padding:3px 9px" onclick="cerrarCorrelativos()">✕ Cancelar</button>
         </div>
         <div class="slots-g" id="corrSlotsGrid" style="max-height:120px"></div>
-      </div>
-      <div style="margin-bottom:.75rem">
-        <button type="button" class="btn-s" id="btnCorr" style="width:100%;justify-content:center;font-size:12.5px;color:var(--azul);border-color:var(--azulp)" onclick="toggleCorrelativos()" disabled>
-          🔗 Agregar turnos correlativos
-        </button>
       </div>
 
       <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:8px;background:var(--rojop);border-radius:var(--r);border:1px solid rgba(226,75,74,.2)">
@@ -1620,6 +1620,7 @@ function abrirNuevoTurno(fecha='', hora='', profId=null){
   document.getElementById('btnCorr').disabled=true;
   document.getElementById('btnCorr').textContent='🔗 Agregar turnos correlativos';
   document.getElementById('btnCorr').style.background='';
+  document.getElementById('btnCorr').style.fontWeight='';
   // Poblar profesionales
   const sel=document.getElementById('nProf');
   sel.innerHTML=profs.map(p=>`<option value="${p.id}">${p.ape}${p.nom?', '+p.nom:''}</option>`).join('');
@@ -2563,6 +2564,9 @@ function toggleCorrelativos(){
     document.getElementById('corrSlotsSec').classList.remove('hidden');
     document.getElementById('btnCorr').style.background = 'var(--azulp)';
     document.getElementById('btnCorr').style.fontWeight = '600';
+    // Asegurarnos de que el panel quede a la vista, sin depender de dónde
+    // esté scrolleado el modal en ese momento.
+    setTimeout(()=>{ document.getElementById('corrSlotsSec').scrollIntoView({behavior:'smooth', block:'nearest'}); }, 50);
   } else {
     cerrarCorrelativos();
   }
