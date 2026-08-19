@@ -1735,8 +1735,11 @@ function selSlot(btn,h){
   // Habilitar botón de correlativos
   const btnCorr = document.getElementById('btnCorr');
   if(btnCorr) btnCorr.disabled=false;
-  // Si ya estaba en modo correlativo, re-renderizar los slots siguientes
-  if(corrModoActivo){ corrHorasExtra=[]; renderCorrSlots(); }
+  // Cambiar el horario base invalida cualquier selección de correlativos que
+  // hubiera antes (esas horas solo tienen sentido relativas al horario base
+  // elegido) — cerramos el panel entero en vez de intentar "reacomodarlo",
+  // así nunca puede quedar mostrando horarios de otro horario base.
+  cerrarCorrelativos();
 }
 
 // Toggle independiente: permite escribir cualquier hora a mano, sea turno
@@ -1763,7 +1766,9 @@ function usarHoraManual(h){
   document.getElementById('nHora').value=h;
   const btnCorr = document.getElementById('btnCorr');
   if(btnCorr) btnCorr.disabled=false;
-  if(corrModoActivo){ corrHorasExtra=[]; renderCorrSlots(); }
+  // Mismo criterio que en selSlot(): cambiar la hora invalida cualquier
+  // selección de correlativos previa, así que cerramos el panel entero.
+  cerrarCorrelativos();
 }
 
 // Buscador paciente en modal
