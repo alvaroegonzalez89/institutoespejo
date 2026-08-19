@@ -2021,10 +2021,10 @@ async function cambiarEstadoTurno(id, estado, idsGrupo){
 
 function editarTurno(id){
   const t=turnos.find(x=>x.id===id); if(!t) return;
-  turnoEditId=id;
   cerrarModal('mDet');
   abrirNuevoTurno(t.fecha, t.hora, t.profesionalId);
   setTimeout(()=>{
+    turnoEditId=id; // se fija DESPUÉS de abrirNuevoTurno(), que resetea este valor a null al abrir en blanco
     document.getElementById('nNom').value=(t.pacNombre||'').split(' ')[0]||'';
     document.getElementById('nApe').value=(t.pacNombre||'').split(' ').slice(1).join(' ')||'';
     document.getElementById('nTel').value=t.pacTel||'';
