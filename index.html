@@ -1257,6 +1257,18 @@ function construirFilasDia(profId, fs, d){
     const enFranjaSobreConfigurada = p.hs.some(h=>h.d===dow && h.tipo==='sobre' && hora>=h.de && hora<h.a);
     const noTrabaja = esFeriado ? true : !enFranja;
 
+    // Si en un mismo horario hay MÁS DE UN turno (típicamente: el turno
+    // normal + un sobreturno cargado encima), no los metemos juntos en una
+    // sola celda — se arma una fila por cada uno, cada una con su propio
+    // color (el sobreturno en rojo), para que se vean claramente separados.
+    if(ts.length>1){
+      [...ts].sort((a,b)=>(a.esSobreturno?1:0)-(b.esSobreturno?1:0)).forEach(tu=>{
+        const esBl = tu.estado==='bloqueado' && !esFeriado;
+        filas.push({hora, horaFin:null, ts:[tu], rango:1, noTrabaja, enFranjaSobreConfigurada, esBloqueado: esBl, bloqueo: esBl?tu:null});
+      });
+      return;
+    }
+
     // Fusionar turnos correlativos consecutivos en una sola fila (mismo criterio que antes, sin rowspan de tabla)
     let horaFin = null, rango = 1;
     if(ts.length===1 && ts[0].grupoCorrelativo){
