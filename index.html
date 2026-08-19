@@ -1645,8 +1645,12 @@ function actualizarSlots(){
   const fecha   = document.getElementById('nFecha').value;
   const esSobre = document.getElementById('nSobre').checked;
   const grid    = document.getElementById('nSlots');
-  document.getElementById('nHora').value='';
-  document.querySelectorAll('.slot-btn').forEach(b=>b.classList.remove('sel'));
+  const manualOn  = document.getElementById('nHoraManualToggle').checked;
+  const manualVal = document.getElementById('nHoraManual').value;
+  // Si el modo "hora a mano" está activo y ya hay algo tipeado, no lo pisamos
+  // al tildar/destildar Sobreturno (eso solo repinta la grilla de abajo).
+  document.getElementById('nHora').value = (manualOn && manualVal) ? manualVal : '';
+  if(!(manualOn && manualVal)) document.querySelectorAll('.slot-btn').forEach(b=>b.classList.remove('sel'));
   if(!profId||!fecha){
     grid.innerHTML='<div class="slot-none">Seleccioná profesional y fecha</div>';
     return;
