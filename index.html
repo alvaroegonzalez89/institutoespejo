@@ -173,14 +173,14 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
 .ag-daycol{border-right:1px solid var(--bor);display:flex;flex-direction:column;min-width:0}
 .ag-daycol:last-child{border-right:none}
 .ag-daycol.hoy{background:rgba(235,243,251,.35)}
-.ag-daycol-hdr{padding:9px 6px;text-align:center;border-bottom:1px solid var(--bor);background:white;position:sticky;top:0;z-index:2}
+.ag-daycol-hdr{padding:9px 6px;text-align:center;border-bottom:1px solid var(--bor);background:white;position:sticky;top:0;z-index:3;min-height:46px;box-sizing:border-box}
 .ag-daycol.hoy .ag-daycol-hdr{background:var(--azulp)}
 .ag-dc-nom{font-size:10.5px;font-weight:600;color:var(--gm);text-transform:capitalize;letter-spacing:.2px}
 .ag-dc-fecha{font-size:11.5px;font-weight:500;color:var(--go);margin-top:1px}
 .ag-daycol.hoy .ag-dc-fecha{color:var(--azul)}
 .ag-dc-cnt{font-size:9.5px;color:var(--gm);margin-top:1px}
 .ag-daytable{width:100%;border-collapse:collapse;table-layout:fixed}
-.ag-daytable th{font-size:9.5px;color:var(--gm);text-transform:uppercase;letter-spacing:.4px;font-weight:600;text-align:left;padding:5px 6px;border-bottom:1px solid var(--bor);background:var(--gc)}
+.ag-daytable th{font-size:9.5px;color:var(--gm);text-transform:uppercase;letter-spacing:.4px;font-weight:600;text-align:left;padding:5px 6px;border-bottom:1px solid var(--bor);background:var(--gc);position:sticky;top:46px;z-index:2}
 .ag-daytable th:first-child{width:56px}
 .ag-daytable td{height:54px;box-sizing:border-box;padding:4px 7px;border-bottom:1px solid var(--bor);font-size:11.5px;vertical-align:middle;cursor:pointer;transition:background .1s;overflow:hidden}
 .ag-daytable tr:last-child td{border-bottom:none}
@@ -562,8 +562,8 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
       </div>
       <div style="text-align:center;font-size:11px;color:var(--gm);margin:-4px 0 10px">— o ingresá los datos del paciente —</div>
       <div class="frow">
-        <div class="fg"><label class="flbl">Nombre</label><input class="finput" id="nNom" placeholder="Nombre"></div>
-        <div class="fg"><label class="flbl">Apellido</label><input class="finput" id="nApe" placeholder="Apellido"></div>
+        <div class="fg"><label class="flbl">Apellido</label><input class="finput" id="nApe" placeholder="Apellido" style="text-transform:uppercase"></div>
+        <div class="fg"><label class="flbl">Nombre</label><input class="finput" id="nNom" placeholder="Nombre" style="text-transform:uppercase"></div>
       </div>
       <div class="frow">
         <div class="fg"><label class="flbl">DNI</label><input class="finput" id="nDni" placeholder="Número de documento"></div>
@@ -572,7 +572,7 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
       <div class="fg"><label class="flbl">Profesional</label><select class="fselect" id="nProf" onchange="actualizarSlots()"></select></div>
       <div class="frow">
         <div class="fg"><label class="flbl">Fecha</label><input class="finput" type="date" id="nFecha" onchange="actualizarSlots()"></div>
-        <div class="fg"><label class="flbl">Servicio / Motivo</label><input class="finput" id="nServ" placeholder="Ej: Consulta, Ortodoncia..."></div>
+        <div class="fg"><label class="flbl">Servicio / Motivo</label><input class="finput" id="nServ" placeholder="Ej: Consulta, Ortodoncia..." style="text-transform:uppercase"></div>
       </div>
       <div class="fg">
         <label class="flbl">Horario disponible</label>
@@ -586,7 +586,7 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
           <input type="time" class="finput" id="nHoraManual" oninput="usarHoraManual(this.value)" style="max-width:140px">
         </div>
       </div>
-      <div class="fg"><label class="flbl">Nota / Observaciones</label><textarea class="finput" id="nNota" style="min-height:50px;resize:vertical" placeholder="Observaciones..."></textarea></div>
+      <div class="fg"><label class="flbl">Nota / Observaciones</label><textarea class="finput" id="nNota" style="min-height:50px;resize:vertical;text-transform:uppercase" placeholder="Observaciones..."></textarea></div>
       <div class="fg">
         <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-bottom:6px">
           <input type="checkbox" id="nTieneLab" onchange="toggleLabSelect()">
@@ -611,10 +611,11 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
         <div class="slots-g" id="corrSlotsGrid" style="max-height:120px"></div>
       </div>
 
-      <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:8px;background:var(--rojop);border-radius:var(--r);border:1px solid rgba(226,75,74,.2)">
-        <input type="checkbox" id="nSobre" onchange="actualizarSlots()">
-        <span><strong>Sobreturno</strong> — se agrega aunque el horario esté ocupado (se muestra en rojo)</span>
-      </label>
+      <!-- El check de "Sobreturno" se sacó de acá: ahora se carga con clic derecho
+           sobre una celda de la agenda (modal "Sobreturno rápido"). Este input
+           queda oculto pero se sigue usando internamente para Turno Urgencia y
+           para las franjas de sobreturno pre-configuradas por el profesional. -->
+      <input type="checkbox" id="nSobre" class="hidden" onchange="actualizarSlots()">
     </div>
     <div class="modal-footer">
       <button class="btn-s" style="color:#B91C1C;border-color:rgba(185,28,28,.3);margin-right:auto" onclick="anularDesdeNuevoTurno()" title="Anular este horario y dejarlo bloqueado">
@@ -706,8 +707,8 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
     <div class="modal-body">
       <input type="hidden" id="npId">
       <div class="frow">
-        <div class="fg"><label class="flbl">Nombre</label><input class="finput" id="npNom"></div>
-        <div class="fg"><label class="flbl">Apellido</label><input class="finput" id="npApe"></div>
+        <div class="fg"><label class="flbl">Apellido</label><input class="finput" id="npApe" style="text-transform:uppercase"></div>
+        <div class="fg"><label class="flbl">Nombre</label><input class="finput" id="npNom" style="text-transform:uppercase"></div>
       </div>
       <div class="frow">
         <div class="fg"><label class="flbl">DNI</label><input class="finput" id="npDni"></div>
@@ -762,11 +763,52 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
         <div class="slots-g" id="blkSlotsGrid"><div class="slot-none">Seleccioná profesional y fecha</div></div>
         <input type="hidden" id="blkHora">
       </div>
-      <div class="fg"><label class="flbl">Motivo</label><input class="finput" id="blkMotivo" placeholder="Ej: Acto oficial, salida del doctor..."></div>
+      <div class="fg"><label class="flbl">Motivo</label><input class="finput" id="blkMotivo" placeholder="Ej: Acto oficial, salida del doctor..." style="text-transform:uppercase"></div>
     </div>
     <div class="modal-footer">
       <button class="btn-s" onclick="cerrarModal('mBloquear')">Cancelar</button>
       <button class="btn-p" style="background:#B91C1C" onclick="guardarBloqueo()">Anular horario</button>
+    </div>
+  </div>
+</div>
+
+<!-- SOBRETURNO RÁPIDO (clic derecho en una celda de la agenda) -->
+<div class="overlay" id="mSobreRapido">
+  <div class="modal" style="width:460px">
+    <div class="modal-hdr" style="background:#B91C1C"><span class="modal-tit">🔴 Sobreturno rápido</span><button class="modal-x" onclick="cerrarModal('mSobreRapido')">×</button></div>
+    <div class="modal-body">
+      <div style="background:#FEE2E2;border-radius:var(--r);padding:.7rem .9rem;margin-bottom:1rem;font-size:13px;color:#B91C1C;font-weight:500" id="srResumen"></div>
+      <div class="fg" style="margin-bottom:.6rem">
+        <label class="flbl">Hora exacta</label>
+        <input class="finput" type="time" id="srHora" style="max-width:140px">
+      </div>
+      <div class="fg">
+        <label class="flbl">Buscar paciente existente</label>
+        <div class="bus-wrap">
+          <input class="finput" id="srBus" placeholder="Apellido o DNI..." oninput="buscarEnModalSR(this.value)">
+          <div class="bus-res" id="srBusRes"></div>
+        </div>
+      </div>
+      <div style="text-align:center;font-size:11px;color:var(--gm);margin:-4px 0 10px">— o ingresá los datos del paciente —</div>
+      <div class="frow">
+        <div class="fg"><label class="flbl">Apellido</label><input class="finput" id="srApe" placeholder="Apellido" style="text-transform:uppercase"></div>
+        <div class="fg"><label class="flbl">Nombre</label><input class="finput" id="srNom" placeholder="Nombre" style="text-transform:uppercase"></div>
+      </div>
+      <div class="frow">
+        <div class="fg"><label class="flbl">DNI</label><input class="finput" id="srDni" placeholder="Número de documento"></div>
+        <div class="fg"><label class="flbl">Teléfono / WhatsApp</label><input class="finput" id="srTel" placeholder="2604xxxxxx"></div>
+      </div>
+      <div class="fg"><label class="flbl">Servicio / Motivo</label><input class="finput" id="srServ" placeholder="Ej: Consulta, Ortodoncia..." style="text-transform:uppercase"></div>
+      <div class="fg"><label class="flbl">Nota / Observaciones</label><textarea class="finput" id="srNota" placeholder="Observaciones..." style="min-height:55px;resize:vertical;text-transform:uppercase"></textarea></div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+        <input type="checkbox" id="srTieneLab" onchange="document.getElementById('srLab').classList.toggle('hidden', !this.checked); if(this.checked) poblarLabSelect('srLab');">
+        <span>🧪 <strong>Tiene laboratorio</strong></span>
+      </label>
+      <select class="fselect hidden" id="srLab" style="margin-top:6px"></select>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-s" onclick="cerrarModal('mSobreRapido')">Cancelar</button>
+      <button class="btn-p" style="background:#B91C1C" onclick="guardarSobreturnoRapido()">🔴 Guardar sobreturno</button>
     </div>
   </div>
 </div>
@@ -1371,7 +1413,7 @@ function renderAgenda(){
       const filasHtml = filas.map(fila=>{
         const r = renderFilaDia(fila, fs);
         const horaLbl = fila.horaFin ? `${fila.hora}<br>${fila.horaFin}` : fila.hora;
-        return `<tr class="${r.claseFila}" onclick="${r.click}" title="${r.titulo}">
+        return `<tr class="${r.claseFila}" onclick="${r.click}" oncontextmenu="event.preventDefault();abrirSobreturnoRapido('${fs}','${fila.hora}','${profFiltro}');return false;" title="${r.titulo} — clic derecho: agregar sobreturno acá">
           <td class="ag-dt-hora">${horaLbl}</td>
           <td>${r.contenido}</td>
         </tr>`;
@@ -1802,12 +1844,12 @@ async function guardarTurno(){
     const fecha  = document.getElementById('nFecha').value;
     const hora   = document.getElementById('nHora').value;
     const esSob  = document.getElementById('nSobre').checked;
-    const nom    = document.getElementById('nNom').value.trim();
-    const ape    = document.getElementById('nApe').value.trim();
+    const nom    = document.getElementById('nNom').value.trim().toUpperCase();
+    const ape    = document.getElementById('nApe').value.trim().toUpperCase();
     const dni    = document.getElementById('nDni').value.trim();
     const tel    = document.getElementById('nTel').value.trim();
-    const serv   = document.getElementById('nServ').value.trim();
-    const nota   = document.getElementById('nNota').value.trim();
+    const serv   = document.getElementById('nServ').value.trim().toUpperCase();
+    const nota   = document.getElementById('nNota').value.trim().toUpperCase();
 
     if(!profId){toast('Seleccioná un profesional','err');return;}
     if(!fecha){toast('Seleccioná una fecha','err');return;}
@@ -1913,7 +1955,116 @@ async function guardarTurno(){
   }
 }
 
-// ── DETALLE TURNO ─────────────────────────────────────────────
+// ── SOBRETURNO RÁPIDO (clic derecho en una celda de la agenda) ──
+// Modal chico y directo: fecha/hora/profesional ya vienen fijos desde la
+// celda en la que se hizo clic derecho, no hay que volver a buscarlos.
+let srPacSelId = null;
+let srCtx = {fecha:'', profId:''};
+
+function abrirSobreturnoRapido(fecha, hora, profId){
+  srCtx = {fecha, profId};
+  srPacSelId = null;
+  const p = gProf(profId);
+  document.getElementById('srResumen').innerHTML =
+    `🔴 Sobreturno · ${labelF(fecha)} · ${p?p.ape+(p.nom?', '+p.nom:''):'—'}`;
+  document.getElementById('srHora').value = hora || '';
+  document.getElementById('srBus').value='';
+  document.getElementById('srBusRes').style.display='none';
+  document.getElementById('srNom').value='';
+  document.getElementById('srApe').value='';
+  document.getElementById('srDni').value='';
+  document.getElementById('srTel').value='';
+  document.getElementById('srServ').value='';
+  document.getElementById('srNota').value='';
+  document.getElementById('srTieneLab').checked=false;
+  document.getElementById('srLab').classList.add('hidden');
+  abrirModal('mSobreRapido');
+}
+
+function buscarEnModalSR(q){
+  const res=document.getElementById('srBusRes');
+  if(!q||q.length<2){res.style.display='none';return;}
+  const hits=pacientes.filter(p=>`${p.ape||''} ${p.nom||''}`.toLowerCase().includes(q.toLowerCase())||(p.dni&&p.dni.includes(q))).slice(0,6);
+  if(!hits.length){res.innerHTML='<div class="bus-item" style="color:var(--gm)">Sin resultados</div>';res.style.display='block';return;}
+  res.innerHTML=hits.map(p=>`<div class="bus-item" onclick="selPacEnModalSR('${p.id}')">
+    <strong>${p.ape||''}, ${p.nom||''}</strong>
+    <span style="font-size:11px;color:var(--gm)">DNI: ${p.dni||'—'} · ${p.telefono||'—'}</span>
+  </div>`).join('');
+  res.style.display='block';
+}
+
+function selPacEnModalSR(id){
+  const p=pacientes.find(x=>x.id===id); if(!p) return;
+  srPacSelId=id;
+  document.getElementById('srNom').value=p.nom||'';
+  document.getElementById('srApe').value=p.ape||'';
+  document.getElementById('srDni').value=p.dni||'';
+  document.getElementById('srTel').value=p.telefono||'';
+  document.getElementById('srBus').value=`${p.ape||''}, ${p.nom||''}`;
+  document.getElementById('srBusRes').style.display='none';
+}
+
+async function guardarSobreturnoRapido(){
+  try {
+    const {fecha, profId} = srCtx;
+    const hora = document.getElementById('srHora').value;
+    const nom  = document.getElementById('srNom').value.trim().toUpperCase();
+    const ape  = document.getElementById('srApe').value.trim().toUpperCase();
+    const dni  = document.getElementById('srDni').value.trim();
+    const tel  = document.getElementById('srTel').value.trim();
+    const serv = document.getElementById('srServ').value.trim().toUpperCase();
+    const nota = document.getElementById('srNota').value.trim().toUpperCase();
+
+    if(!profId){toast('Falta el profesional','err');return;}
+    if(!fecha){toast('Falta la fecha','err');return;}
+    if(!hora){toast('Ingresá la hora','err');return;}
+    if(!nom&&!ape){toast('Ingresá el nombre del paciente','err');return;}
+
+    // Buscar o crear paciente — mismo criterio que en el modal completo
+    let pacId = srPacSelId || null;
+    if(!pacId){
+      const telNorm = tel.replace(/\D/g,'');
+      if(dni){ const exist = pacientes.find(p=>p.dni&&p.dni===dni); if(exist) pacId = exist.id; }
+      if(!pacId && telNorm){ const exist = pacientes.find(p=>p.telefono && p.telefono.replace(/\D/g,'')===telNorm); if(exist) pacId = exist.id; }
+      if(!pacId && nom && ape){
+        const exist = pacientes.find(p=>(p.nom||'').trim().toLowerCase()===nom.toLowerCase() && (p.ape||'').trim().toLowerCase()===ape.toLowerCase());
+        if(exist) pacId = exist.id;
+      }
+      if(!pacId){
+        const ref = await db.collection('pacientes').add({
+          nom: nom, ape: ape, dni: dni, telefono: tel,
+          creadoEn: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        pacId = ref.id;
+      }
+    }
+
+    const tieneLab = document.getElementById('srTieneLab').checked;
+    const labNombre = tieneLab ? document.getElementById('srLab').value : '';
+
+    await db.collection('turnos').add({
+      profesionalId: profId,
+      pacienteId: pacId,
+      pacNombre: (nom + ' ' + ape).trim(),
+      pacTel: tel,
+      fecha: fecha,
+      hora: hora,
+      servicio: serv || 'Consulta',
+      estado: 'dado',
+      esSobreturno: true,
+      nota: nota,
+      labNombre: labNombre,
+      creadoEn: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    toast('✓ Sobreturno agregado','ok');
+    cerrarModal('mSobreRapido');
+  } catch(e){
+    console.error('Error guardarSobreturnoRapido:', e);
+    toast('Error: ' + e.message, 'err');
+  }
+}
+
+
 function verDetalle(id){
   const t=turnos.find(x=>x.id===id); if(!t) return;
   const p=gProf(t.profesionalId);
@@ -1951,7 +2102,7 @@ function verDetalle(id){
     <div class="wa-prev">Hola ${(t.pacNombre||'').split(' ')[0]} 👋 Te recordamos tu turno en Instituto Espejo el ${labelF(t.fecha)} a las ${t.hora} hs con ${p?p.nom+' '+p.ape:'el profesional'}.<br>📍 San Rafael, Mendoza · ☎ ${TEL}<br><br>Por favor confirmanos tu asistencia respondiendo este mensaje:<br>✅ <strong>SI</strong> — Confirmo que asistiré<br>❌ <strong>NO</strong> — No voy a poder asistir<br><br>¡Te esperamos! 😊</div>
     <div style="margin-top:.75rem">
       <label class="flbl">Nota clínica</label>
-      <textarea class="finput" id="detNota" style="min-height:55px;resize:vertical;margin-top:4px">${t.nota||''}</textarea>
+      <textarea class="finput" id="detNota" style="min-height:55px;resize:vertical;margin-top:4px;text-transform:uppercase">${t.nota||''}</textarea>
     </div>
     <div class="fg" style="margin-top:.75rem">
       <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-bottom:6px">
@@ -2007,7 +2158,7 @@ async function cancelarTurno(id){
 }
 
 async function guardarDetalle(id){
-  const nota=document.getElementById('detNota').value.trim();
+  const nota=document.getElementById('detNota').value.trim().toUpperCase();
   const tieneLab = document.getElementById('detTieneLab').checked;
   const labNombre = tieneLab ? document.getElementById('detLab').value : '';
   await db.collection('turnos').doc(id).update({nota, labNombre});
@@ -2457,7 +2608,7 @@ async function verFicha(pacId){
     }).join(''):'<div class="empty">Sin historial de visitas</div>'}
     <div style="margin-top:1rem;padding-top:.85rem;border-top:1px solid var(--bor)">
       <label class="flbl">Nota general del paciente</label>
-      <textarea class="finput" id="fichaNotaG" style="min-height:60px;resize:vertical;margin-top:4px">${p.notaGeneral||''}</textarea>
+      <textarea class="finput" id="fichaNotaG" style="min-height:60px;resize:vertical;margin-top:4px;text-transform:uppercase">${p.notaGeneral||''}</textarea>
     </div>
   `;
   document.getElementById('fichaFooter').innerHTML=`
@@ -2479,7 +2630,7 @@ function agregarNotaTurno(turnoId, pacId){
 }
 
 async function guardarNotaGeneral(pacId){
-  const nota=document.getElementById('fichaNotaG').value.trim();
+  const nota=document.getElementById('fichaNotaG').value.trim().toUpperCase();
   await db.collection('pacientes').doc(pacId).update({notaGeneral:nota});
   toast('Nota guardada ✓','ok');
 }
@@ -2533,8 +2684,8 @@ async function borrarPaciente(){
 
 async function guardarPaciente(){
   const id=document.getElementById('npId').value;
-  const nom=document.getElementById('npNom').value.trim();
-  const ape=document.getElementById('npApe').value.trim();
+  const nom=document.getElementById('npNom').value.trim().toUpperCase();
+  const ape=document.getElementById('npApe').value.trim().toUpperCase();
   if(!nom&&!ape){toast('Ingresá nombre o apellido','err');return;}
   const data={
     nom, ape,
@@ -2707,7 +2858,7 @@ async function guardarBloqueo(){
   const profId = document.getElementById('blkProf').value;
   const fecha = document.getElementById('blkFecha').value;
   const hora = document.getElementById('blkHora').value;
-  const motivo = document.getElementById('blkMotivo').value.trim();
+  const motivo = document.getElementById('blkMotivo').value.trim().toUpperCase();
   if(!profId||!fecha||!hora){ toast('Seleccioná profesional, fecha y horario','err'); return; }
   try {
     await db.collection('turnos').add({
