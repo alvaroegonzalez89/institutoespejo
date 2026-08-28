@@ -959,6 +959,11 @@ function addMins(hhmm, mins){
   return `${S(Math.floor(t/60))}:${S(t%60)}`;
 }
 function gProf(id){ return profs.find(p=>p.id===id); }
+// Limpia cualquier teléfono guardado con formato ("2267-063-3273", "(260) 4606901",
+// espacios, etc.) a solo dígitos — así el link de wa.me nunca se rompe por un
+// caracter suelto que quedó al tipear el número.
+function telLimpio(tel){ return (tel||'').replace(/\D/g,''); }
+
 function labelF(str){
   const d=new Date(str+'T00:00:00');
   return `${d.getDate()} de ${MESES[d.getMonth()]}`;
@@ -1478,7 +1483,7 @@ function renderRecordatorios(){
         <div style="font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.pacNombre||'—'}</div>
         <div style="font-size:10.5px;color:var(--gm)">${t.hora} · ${p?p.ape:''}</div>
       </div>
-      ${t.pacTel?`<a href="https://wa.me/549${t.pacTel}?text=${msg}" target="_blank" class="btn-wa-sm">WA</a>`:''}
+      ${t.pacTel?`<a href="https://wa.me/549${telLimpio(t.pacTel)}?text=${msg}" target="wa_instituto" class="btn-wa-sm">WA</a>`:''}
     </div>`;
   };
   document.getElementById('recSbEl').innerHTML=ts.slice(0,4).map(mkRow).join('')+(ts.length>4?`<div style="padding:.5rem;font-size:12px;color:var(--gm);text-align:center">+${ts.length-4} más</div>`:'');
@@ -1495,7 +1500,7 @@ function enviarTodosWA(){
       const p=gProf(t.profesionalId);
       const linkConf = `https://institutoespejo.vercel.app/?confirmar=${t.id}`;
     const msg=encodeURIComponent(`Hola ${(t.pacNombre||'').split(' ')[0]} 👋 Te recordamos tu turno en *Instituto Espejo* mañana *${labelF(t.fecha)}* a las *${t.hora} hs* con *${p?p.nom+' '+p.ape:'el profesional'}*.\n📍 San Rafael, Mendoza · ☎ ${TEL}\n\n👆 Confirmá tu asistencia tocando este link:\n${linkConf}\n\n¡Te esperamos! 😊`);
-      window.open(`https://wa.me/549${t.pacTel}?text=${msg}`,'_blank');
+      window.open(`https://wa.me/549${telLimpio(t.pacTel)}?text=${msg}`,'wa_instituto');
     },i*900);
   });
   toast(`Abriendo ${ts.length} chats de WhatsApp...`,'wa');
@@ -1847,7 +1852,7 @@ async function guardarTurno(){
     const nom    = document.getElementById('nNom').value.trim().toUpperCase();
     const ape    = document.getElementById('nApe').value.trim().toUpperCase();
     const dni    = document.getElementById('nDni').value.trim();
-    const tel    = document.getElementById('nTel').value.trim();
+    const tel    = telLimpio(document.getElementById('nTel').value.trim());
     const serv   = document.getElementById('nServ').value.trim().toUpperCase();
     const nota   = document.getElementById('nNota').value.trim().toUpperCase();
 
@@ -2011,7 +2016,7 @@ async function guardarSobreturnoRapido(){
     const nom  = document.getElementById('srNom').value.trim().toUpperCase();
     const ape  = document.getElementById('srApe').value.trim().toUpperCase();
     const dni  = document.getElementById('srDni').value.trim();
-    const tel  = document.getElementById('srTel').value.trim();
+    const tel  = telLimpio(document.getElementById('srTel').value.trim());
     const serv = document.getElementById('srServ').value.trim().toUpperCase();
     const nota = document.getElementById('srNota').value.trim().toUpperCase();
 
@@ -2134,7 +2139,7 @@ function verDetalle(id){
       const p2=gProf(t.profesionalId);
       const linkConf3 = 'https://institutoespejo.vercel.app/?confirmar='+t.id;
       const msg=encodeURIComponent('Hola '+t.pacNombre.split(' ')[0]+' 👋 Te recordamos tu turno en *Instituto Espejo* el *'+labelF(t.fecha)+'* a las *'+t.hora+' hs* con *'+(p2?p2.nom+' '+p2.ape:'el profesional')+'*.\n📍 San Rafael, Mendoza · ☎ '+TEL+'\n\n👆 Confirmá tu asistencia tocando este link:\n'+linkConf3+'\n\n¡Te esperamos! 😊');
-      return `<a href="https://wa.me/549${t.pacTel}?text=${msg}" target="_blank" class="btn-wa">WA</a>`;
+      return `<a href="https://wa.me/549${telLimpio(t.pacTel)}?text=${msg}" target="wa_instituto" class="btn-wa">WA</a>`;
     })():''}
   `;
   if(t.labNombre){ poblarLabSelect('detLab'); document.getElementById('detLab').value=t.labNombre; }
@@ -2690,7 +2695,7 @@ async function guardarPaciente(){
   const data={
     nom, ape,
     dni:document.getElementById('npDni').value.trim(),
-    telefono:document.getElementById('npTel').value.trim(),
+    telefono:telLimpio(document.getElementById('npTel').value.trim()),
     email:document.getElementById('npEmail').value.trim(),
     fechaNac:document.getElementById('npFecNac').value,
     obraSocial:document.getElementById('npOs').value.trim(),
