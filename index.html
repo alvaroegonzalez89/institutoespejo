@@ -173,12 +173,15 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
 .ag-daycol{border-right:1px solid var(--bor);display:flex;flex-direction:column;min-width:0}
 .ag-daycol:last-child{border-right:none}
 .ag-daycol.hoy{background:rgba(235,243,251,.35)}
-.ag-daycol-hdr{padding:9px 6px;text-align:center;border-bottom:1px solid var(--bor);background:white;position:sticky;top:0;z-index:3;min-height:46px;box-sizing:border-box}
+.ag-daycol-hdr{padding:9px 6px;text-align:center;border-bottom:1px solid var(--bor);background:white;position:sticky;top:0;z-index:3;min-height:46px;box-sizing:border-box;cursor:pointer;transition:background .12s}
+.ag-daycol-hdr:hover{background:var(--gc)}
 .ag-daycol.hoy .ag-daycol-hdr{background:var(--azulp)}
+.ag-daycol.hoy .ag-daycol-hdr:hover{background:var(--azulp);filter:brightness(.97)}
 .ag-dc-nom{font-size:10.5px;font-weight:600;color:var(--gm);text-transform:capitalize;letter-spacing:.2px}
 .ag-dc-fecha{font-size:11.5px;font-weight:500;color:var(--go);margin-top:1px}
 .ag-daycol.hoy .ag-dc-fecha{color:var(--azul)}
 .ag-dc-cnt{font-size:9.5px;color:var(--gm);margin-top:1px}
+.ag-dc-exp{font-size:9px;color:var(--azulm);margin-top:2px;font-weight:500}
 .ag-daytable{width:100%;border-collapse:collapse;table-layout:fixed}
 .ag-daytable th{font-size:9.5px;color:var(--gm);text-transform:uppercase;letter-spacing:.4px;font-weight:600;text-align:left;padding:5px 6px;border-bottom:1px solid var(--bor);background:var(--gc);position:sticky;top:46px;z-index:2}
 .ag-daytable th:first-child{width:56px}
@@ -205,6 +208,19 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
 .ag-dt-det{font-size:10px;color:var(--gm);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ag-dc-empty{padding:1.5rem .75rem;text-align:center;font-size:11.5px;color:var(--gm)}
 .ag-dc-aviso{background:#FEE2E2;color:#B91C1C;font-size:10.5px;font-weight:500;padding:6px 8px;line-height:1.4;border-bottom:1px solid #FCA5A5}
+
+/* VISTA DÍA AMPLIADA (clic en encabezado de columna) */
+.diaamp-hdr-bar{display:flex;align-items:center;gap:10px;padding:.5rem 0 .85rem;flex-wrap:wrap;border-bottom:1px solid var(--bor);margin-bottom:.75rem}
+.diaamp-tabla-wrap{overflow-x:auto;border:1px solid var(--bor);border-radius:var(--r)}
+.diaamp-tabla{width:100%;border-collapse:collapse;font-size:12.5px;min-width:920px}
+.diaamp-tabla th{background:var(--azul);color:white;padding:8px 10px;text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;font-weight:600;position:sticky;top:0}
+.diaamp-tabla td{padding:8px 10px;border-bottom:1px solid var(--bor);vertical-align:top}
+.diaamp-tabla tr:nth-child(even) td{background:var(--gc)}
+.diaamp-tabla tr:hover td{background:var(--azulp)}
+.diaamp-tabla tr{cursor:pointer}
+.diaamp-vacio{padding:2rem;text-align:center;color:var(--gm);font-size:13px}
+.diaamp-obs{max-width:190px;white-space:normal;font-size:11.5px;color:var(--gm)}
+.diaamp-os{white-space:nowrap;font-size:11.5px}
 
 /* TOOLBAR */
 .toolbar{display:flex;align-items:center;gap:8px;margin-bottom:.85rem;flex-wrap:wrap}
@@ -279,6 +295,7 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
 .overlay.open{display:flex}
 .modal{background:white;border-radius:var(--rl);width:500px;max-width:96vw;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.22);max-height:90vh;display:flex;flex-direction:column}
 .modal-w{width:620px}
+.modal-xl{width:980px}
 .modal-hdr{background:var(--azul);color:white;padding:1rem 1.25rem;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
 .modal-tit{font-size:15px;font-weight:500}
 .modal-x{background:rgba(255,255,255,.15);border:none;color:white;width:26px;height:26px;border-radius:50%;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;line-height:1}
@@ -574,6 +591,10 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
         <div class="fg"><label class="flbl">Fecha</label><input class="finput" type="date" id="nFecha" onchange="actualizarSlots()"></div>
         <div class="fg"><label class="flbl">Servicio / Motivo</label><input class="finput" id="nServ" placeholder="Ej: Consulta, Ortodoncia..." style="text-transform:uppercase"></div>
       </div>
+      <div class="frow">
+        <div class="fg"><label class="flbl">Obra social</label><input class="finput" id="nObraSocial" placeholder="Ej: OSDE, particular..." style="text-transform:uppercase"></div>
+        <div class="fg"><label class="flbl">Observaciones</label><input class="finput" id="nObs" placeholder="Ej: entregó $ seña, trae radiografía..." style="text-transform:uppercase"></div>
+      </div>
       <div class="fg">
         <label class="flbl">Horario disponible</label>
         <div class="slots-g" id="nSlots"><div class="slot-none">Seleccioná profesional y fecha</div></div>
@@ -586,7 +607,7 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
           <input type="time" class="finput" id="nHoraManual" oninput="usarHoraManual(this.value)" style="max-width:140px">
         </div>
       </div>
-      <div class="fg"><label class="flbl">Nota / Observaciones</label><textarea class="finput" id="nNota" style="min-height:50px;resize:vertical;text-transform:uppercase" placeholder="Observaciones..."></textarea></div>
+      <div class="fg"><label class="flbl">Nota clínica</label><textarea class="finput" id="nNota" style="min-height:50px;resize:vertical;text-transform:uppercase" placeholder="Nota clínica del profesional..."></textarea></div>
       <div class="fg">
         <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-bottom:6px">
           <input type="checkbox" id="nTieneLab" onchange="toggleLabSelect()">
@@ -633,6 +654,18 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
     <div class="modal-hdr"><span class="modal-tit" id="detTit">Detalle</span><button class="modal-x" onclick="cerrarModal('mDet')">×</button></div>
     <div class="modal-body" id="detBody"></div>
     <div class="modal-footer" id="detFooter"></div>
+  </div>
+</div>
+
+<!-- MODAL VISTA DÍA AMPLIADA -->
+<div class="overlay" id="mDiaAmp">
+  <div class="modal modal-xl">
+    <div class="modal-hdr"><span class="modal-tit" id="diaAmpTit">Día</span><button class="modal-x" onclick="cerrarModal('mDiaAmp')">×</button></div>
+    <div class="modal-body" id="diaAmpBody"></div>
+    <div class="modal-footer">
+      <button class="btn-s" onclick="cerrarModal('mDiaAmp')">Cerrar</button>
+      <button class="btn-p" onclick="cerrarModal('mDiaAmp');abrirNuevoTurno(diaAmpFecha,'',diaAmpProfId)">+ Nuevo turno este día</button>
+    </div>
   </div>
 </div>
 
@@ -798,8 +831,12 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
         <div class="fg"><label class="flbl">DNI</label><input class="finput" id="srDni" placeholder="Número de documento"></div>
         <div class="fg"><label class="flbl">Teléfono / WhatsApp</label><input class="finput" id="srTel" placeholder="2604xxxxxx"></div>
       </div>
-      <div class="fg"><label class="flbl">Servicio / Motivo</label><input class="finput" id="srServ" placeholder="Ej: Consulta, Ortodoncia..." style="text-transform:uppercase"></div>
-      <div class="fg"><label class="flbl">Nota / Observaciones</label><textarea class="finput" id="srNota" placeholder="Observaciones..." style="min-height:55px;resize:vertical;text-transform:uppercase"></textarea></div>
+      <div class="frow">
+        <div class="fg"><label class="flbl">Obra social</label><input class="finput" id="srObraSocial" placeholder="Ej: OSDE, particular..." style="text-transform:uppercase"></div>
+        <div class="fg"><label class="flbl">Servicio / Motivo</label><input class="finput" id="srServ" placeholder="Ej: Consulta, Ortodoncia..." style="text-transform:uppercase"></div>
+      </div>
+      <div class="fg"><label class="flbl">Observaciones</label><input class="finput" id="srObs" placeholder="Ej: entregó $ seña, trae radiografía..." style="text-transform:uppercase"></div>
+      <div class="fg"><label class="flbl">Nota clínica</label><textarea class="finput" id="srNota" placeholder="Nota clínica..." style="min-height:55px;resize:vertical;text-transform:uppercase"></textarea></div>
       <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
         <input type="checkbox" id="srTieneLab" onchange="document.getElementById('srLab').classList.toggle('hidden', !this.checked); if(this.checked) poblarLabSelect('srLab');">
         <span>🧪 <strong>Tiene laboratorio</strong></span>
@@ -939,6 +976,8 @@ let unsubTurnos  = null;
 let unsubPacs    = null;
 let unsubProfsCfg = null;
 let unsubFeriados = null;
+let diaAmpFecha  = ''; // fecha actualmente mostrada en la vista de día ampliada
+let diaAmpProfId = ''; // profesional actualmente mostrado en la vista de día ampliada
 
 // ── HELPERS ──────────────────────────────────────────────────
 function hoyStr() {
@@ -1163,6 +1202,7 @@ function iniciarListeners(){
       actualizarStats();
       renderMiniCal();
       if(profSelDoc) renderVistaMedico();
+      if(diaAmpFecha && diaAmpProfId) renderDiaAmpliado();
     }, err=>{
       console.error('onSnapshot turnos error:', err);
       if(err.code==='permission-denied' && !window._reintentoTurnos){
@@ -1427,9 +1467,10 @@ function renderAgenda(){
     }
 
     cols += `<div class="ag-daycol${esH?' hoy':''}">
-      <div class="ag-daycol-hdr">
+      <div class="ag-daycol-hdr" onclick="abrirDiaAmpliado('${fs}','${profFiltro}')" title="Ver el día completo, con todos los datos de cada paciente">
         <div class="ag-dc-nom">${DIAS_ABR[d.getDay()]}</div>
         <div class="ag-dc-fecha">${S(d.getDate())}/${S(d.getMonth()+1)}/${d.getFullYear()}</div>
+        <div class="ag-dc-exp">🔍 ver día</div>
       </div>
       ${cuerpo}
     </div>`;
@@ -1440,6 +1481,67 @@ function renderAgenda(){
 
 function celdaClick(fecha, hora){
   abrirNuevoTurno(fecha, hora, profFiltro);
+}
+
+// ── VISTA DÍA AMPLIADA (clic en el encabezado de una columna del día) ────
+// Tabla tipo Excel: una fila por paciente/horario, con todos los datos
+// cargados (obra social, observaciones, nota clínica, laboratorio, estado),
+// para que la secretaría pueda ver todo de un vistazo sin abrir turno por turno.
+function abrirDiaAmpliado(fecha, profId){
+  diaAmpFecha = fecha;
+  diaAmpProfId = profId;
+  renderDiaAmpliado();
+  abrirModal('mDiaAmp');
+}
+
+function renderDiaAmpliado(){
+  const p = gProf(diaAmpProfId);
+  const d = new Date(diaAmpFecha+'T00:00:00');
+  document.getElementById('diaAmpTit').textContent =
+    `${DIAS_L[d.getDay()]} ${S(d.getDate())}/${S(d.getMonth()+1)}/${d.getFullYear()} · ${p?(p.ape+(p.nom?', '+p.nom:'')):''}`;
+
+  const esValido = t => t.estado!=='cancelado' && t.estado!=='bloqueado';
+  const ts = turnos
+    .filter(t=>t.profesionalId===diaAmpProfId && t.fecha===diaAmpFecha && esValido(t))
+    .sort((a,b)=>a.hora.localeCompare(b.hora));
+
+  const estLabels={espera:'En espera',dado:'Dado',presente:'Presente',asa:'Ausente s/aviso',aca:'Ausente c/aviso'};
+  const estClase={espera:'espera',dado:'confirmado',presente:'presente',asa:'asa',aca:'aca'};
+
+  const wrap = document.getElementById('diaAmpBody');
+  const barra = `<div class="diaamp-hdr-bar">
+    <span style="font-size:13px;color:var(--gm)">${ts.length} turno${ts.length!==1?'s':''} este día</span>
+  </div>`;
+
+  if(!ts.length){
+    wrap.innerHTML = barra + `<div class="diaamp-vacio">Sin turnos cargados para este día.</div>`;
+    return;
+  }
+
+  const filas = ts.map(t=>{
+    const est = t.estado || 'dado';
+    return `<tr onclick="cerrarModal('mDiaAmp');verDetalle('${t.id}')" title="Clic para abrir el turno">
+      <td><strong>${t.hora}</strong>${t.esSobreturno?'<br><span style="color:#B91C1C;font-size:10.5px;font-weight:600">SOBRETURNO</span>':''}</td>
+      <td>${t.pacNombre||'—'}</td>
+      <td>${t.pacTel||'—'}</td>
+      <td>${t.servicio||'—'}</td>
+      <td class="diaamp-os">${t.obraSocial||'—'}</td>
+      <td class="diaamp-obs">${t.observaciones||'—'}</td>
+      <td class="diaamp-obs">${t.nota||'—'}</td>
+      <td>${t.labNombre?`🧪 ${t.labNombre}`:'—'}</td>
+      <td><span class="pill ${estClase[est]||'dado'}">${estLabels[est]||est}</span></td>
+    </tr>`;
+  }).join('');
+
+  wrap.innerHTML = barra + `<div class="diaamp-tabla-wrap">
+    <table class="diaamp-tabla">
+      <thead><tr>
+        <th>Hora</th><th>Paciente</th><th>Teléfono</th><th>Servicio</th>
+        <th>Obra social</th><th>Observaciones</th><th>Nota clínica</th><th>Lab</th><th>Estado</th>
+      </tr></thead>
+      <tbody>${filas}</tbody>
+    </table>
+  </div>`;
 }
 
 // ── TURNOS HOY ────────────────────────────────────────────────
@@ -1649,7 +1751,7 @@ function irAFechaDoc(f){
 function abrirNuevoTurno(fecha='', hora='', profId=null){
   turnoEditId=null; pacSelModal=null;
   // Limpiar
-  ['nNom','nApe','nDni','nTel','nServ','nNota','nBus'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  ['nNom','nApe','nDni','nTel','nServ','nNota','nBus','nObraSocial','nObs'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
   document.getElementById('nHora').value='';
   document.getElementById('nHoraManual').value='';
   document.getElementById('nHoraManualToggle').checked=false;
@@ -1839,6 +1941,7 @@ function selPacEnModal(id){
   document.getElementById('nApe').value=p.ape||'';
   document.getElementById('nDni').value=p.dni||'';
   document.getElementById('nTel').value=p.telefono||'';
+  document.getElementById('nObraSocial').value=p.obraSocial||'';
   document.getElementById('nBus').value=`${p.ape||''}, ${p.nom||''}`;
   document.getElementById('nBusRes').style.display='none';
 }
@@ -1855,6 +1958,8 @@ async function guardarTurno(){
     const tel    = telLimpio(document.getElementById('nTel').value.trim());
     const serv   = document.getElementById('nServ').value.trim().toUpperCase();
     const nota   = document.getElementById('nNota').value.trim().toUpperCase();
+    const obraSocial = document.getElementById('nObraSocial').value.trim().toUpperCase();
+    const observaciones = document.getElementById('nObs').value.trim().toUpperCase();
 
     if(!profId){toast('Seleccioná un profesional','err');return;}
     if(!fecha){toast('Seleccioná una fecha','err');return;}
@@ -1893,6 +1998,7 @@ async function guardarTurno(){
           ape: ape,
           dni: dni,
           telefono: tel,
+          obraSocial: obraSocial,
           creadoEn: firebase.firestore.FieldValue.serverTimestamp()
         });
         pacId = ref.id;
@@ -1915,6 +2021,8 @@ async function guardarTurno(){
       estado: turnoEditId ? undefined : 'dado',
       esSobreturno: esSob,
       nota: nota,
+      obraSocial: obraSocial,
+      observaciones: observaciones,
       labNombre: labNombre,
       creadoEn: firebase.firestore.FieldValue.serverTimestamp()
     };
@@ -1981,6 +2089,8 @@ function abrirSobreturnoRapido(fecha, hora, profId){
   document.getElementById('srTel').value='';
   document.getElementById('srServ').value='';
   document.getElementById('srNota').value='';
+  document.getElementById('srObraSocial').value='';
+  document.getElementById('srObs').value='';
   document.getElementById('srTieneLab').checked=false;
   document.getElementById('srLab').classList.add('hidden');
   abrirModal('mSobreRapido');
@@ -2005,6 +2115,7 @@ function selPacEnModalSR(id){
   document.getElementById('srApe').value=p.ape||'';
   document.getElementById('srDni').value=p.dni||'';
   document.getElementById('srTel').value=p.telefono||'';
+  document.getElementById('srObraSocial').value=p.obraSocial||'';
   document.getElementById('srBus').value=`${p.ape||''}, ${p.nom||''}`;
   document.getElementById('srBusRes').style.display='none';
 }
@@ -2019,6 +2130,8 @@ async function guardarSobreturnoRapido(){
     const tel  = telLimpio(document.getElementById('srTel').value.trim());
     const serv = document.getElementById('srServ').value.trim().toUpperCase();
     const nota = document.getElementById('srNota').value.trim().toUpperCase();
+    const obraSocial = document.getElementById('srObraSocial').value.trim().toUpperCase();
+    const observaciones = document.getElementById('srObs').value.trim().toUpperCase();
 
     if(!profId){toast('Falta el profesional','err');return;}
     if(!fecha){toast('Falta la fecha','err');return;}
@@ -2037,7 +2150,7 @@ async function guardarSobreturnoRapido(){
       }
       if(!pacId){
         const ref = await db.collection('pacientes').add({
-          nom: nom, ape: ape, dni: dni, telefono: tel,
+          nom: nom, ape: ape, dni: dni, telefono: tel, obraSocial: obraSocial,
           creadoEn: firebase.firestore.FieldValue.serverTimestamp()
         });
         pacId = ref.id;
@@ -2058,6 +2171,8 @@ async function guardarSobreturnoRapido(){
       estado: 'dado',
       esSobreturno: true,
       nota: nota,
+      obraSocial: obraSocial,
+      observaciones: observaciones,
       labNombre: labNombre,
       creadoEn: firebase.firestore.FieldValue.serverTimestamp()
     });
@@ -2098,13 +2213,19 @@ function verDetalle(id){
       <div class="det-row"><span class="det-k">Profesional</span><span class="det-v" style="color:${p?.color}">${p?p.nom+' '+p.ape:'—'}</span></div>
       <div class="det-row"><span class="det-k">Especialidad</span><span class="det-v">${p?.esp||'—'}</span></div>
       <div class="det-row"><span class="det-k">Servicio</span><span class="det-v">${t.servicio||'—'}</span></div>
-      <div class="det-row"><span class="det-k">Nota</span><span class="det-v">${t.nota||'—'}</span></div>
+      <div class="det-row"><span class="det-k">Obra social</span><span class="det-v">${t.obraSocial||'—'}</span></div>
+      <div class="det-row"><span class="det-k">Observaciones</span><span class="det-v">${t.observaciones||'—'}</span></div>
+      <div class="det-row"><span class="det-k">Nota clínica</span><span class="det-v">${t.nota||'—'}</span></div>
     </div>
     ${historial.length?`<div style="margin-bottom:.85rem">
       <div style="font-size:10.5px;font-weight:600;color:var(--gm);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">Historial del paciente</div>
       ${historial.map(h=>{const hp=gProf(h.profesionalId);return `<div class="hist-row"><span style="min-width:90px;color:var(--gm)">${labelF(h.fecha)}</span><span style="flex:1">${hp?.ape||'—'} · ${h.servicio||'—'}</span>${h.nota?`<span style="color:var(--ambar);font-style:italic;font-size:11px">${h.nota}</span>`:''}</div>`;}).join('')}
     </div>`:''}
     <div class="wa-prev">Hola ${(t.pacNombre||'').split(' ')[0]} 👋 Te recordamos tu turno en Instituto Espejo el ${labelF(t.fecha)} a las ${t.hora} hs con ${p?p.nom+' '+p.ape:'el profesional'}.<br>📍 San Rafael, Mendoza · ☎ ${TEL}<br><br>Por favor confirmanos tu asistencia respondiendo este mensaje:<br>✅ <strong>SI</strong> — Confirmo que asistiré<br>❌ <strong>NO</strong> — No voy a poder asistir<br><br>¡Te esperamos! 😊</div>
+    <div class="frow" style="margin-top:.75rem">
+      <div><label class="flbl">Obra social</label><input class="finput" id="detObraSocial" style="margin-top:4px;text-transform:uppercase" value="${t.obraSocial||''}"></div>
+      <div><label class="flbl">Observaciones</label><input class="finput" id="detObs" style="margin-top:4px;text-transform:uppercase" value="${t.observaciones||''}"></div>
+    </div>
     <div style="margin-top:.75rem">
       <label class="flbl">Nota clínica</label>
       <textarea class="finput" id="detNota" style="min-height:55px;resize:vertical;margin-top:4px;text-transform:uppercase">${t.nota||''}</textarea>
@@ -2164,9 +2285,11 @@ async function cancelarTurno(id){
 
 async function guardarDetalle(id){
   const nota=document.getElementById('detNota').value.trim().toUpperCase();
+  const obraSocial=document.getElementById('detObraSocial').value.trim().toUpperCase();
+  const observaciones=document.getElementById('detObs').value.trim().toUpperCase();
   const tieneLab = document.getElementById('detTieneLab').checked;
   const labNombre = tieneLab ? document.getElementById('detLab').value : '';
-  await db.collection('turnos').doc(id).update({nota, labNombre});
+  await db.collection('turnos').doc(id).update({nota, obraSocial, observaciones, labNombre});
   toast('Guardado ✓','ok');
   cerrarModal('mDet');
 }
@@ -2193,6 +2316,8 @@ function editarTurno(id){
     document.getElementById('nTel').value=t.pacTel||'';
     document.getElementById('nServ').value=t.servicio||'';
     document.getElementById('nNota').value=t.nota||'';
+    document.getElementById('nObraSocial').value=t.obraSocial||'';
+    document.getElementById('nObs').value=t.observaciones||'';
     document.getElementById('nSobre').checked=t.esSobreturno||false;
     actualizarSlots(); // re-renderiza la grilla ya con "Sobreturno" en su valor real
     // Si la hora del turno no coincide con ningún slot de la grilla (p. ej.
