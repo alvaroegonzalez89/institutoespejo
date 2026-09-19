@@ -287,6 +287,7 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
 /* BUSCADOR PACIENTE */
 .bus-wrap{position:relative}
 .bus-res{position:absolute;top:100%;left:0;right:0;background:white;border:1.5px solid var(--azulm);border-radius:var(--r);box-shadow:var(--sh);z-index:300;max-height:220px;overflow-y:auto;display:none}
+.bus-res-inline{position:static;margin-top:6px;box-shadow:none;border-width:1.5px}
 .bus-item{padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--bor);display:flex;flex-direction:column;gap:2px}
 .bus-item:last-child{border-bottom:none}
 .bus-item:hover{background:var(--azulp)}
@@ -577,7 +578,7 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
           <div class="fg"><label class="flbl">Apellido</label><input class="finput" id="nApe" placeholder="Apellido — empezá a escribir para buscar" style="text-transform:uppercase" autocomplete="off" oninput="buscarEnModalCampos()"></div>
           <div class="fg"><label class="flbl">Nombre</label><input class="finput" id="nNom" placeholder="Nombre" style="text-transform:uppercase" autocomplete="off" oninput="buscarEnModalCampos()"></div>
         </div>
-        <div class="bus-res" id="nBusRes"></div>
+        <div class="bus-res bus-res-inline" id="nBusRes"></div>
       </div>
       <div class="frow">
         <div class="fg"><label class="flbl">DNI</label><input class="finput" id="nDni" placeholder="Número de documento" autocomplete="off" oninput="buscarEnModalCampos()"></div>
