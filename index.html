@@ -1102,7 +1102,7 @@ async function cargarTurnoConfirmacion(turnoId){
     const fechaTxt = `${d.getDate()} de ${MESES_CF[d.getMonth()]} ${d.getFullYear()}`;
 
     // Obtener profesional (simplificado — buscamos en los datos del turno)
-    document.getElementById('cfNombre').textContent = `Hola, ${(t.pacNombre||'').split(' ')[0]} 👋`;
+    document.getElementById('cfNombre').textContent = `Hola, ${t.pacNombrePila || (t.pacNombre||'').split(' ')[0]} 👋`;
     document.getElementById('cfDetalle').innerHTML = `
       <strong>Tu turno:</strong><br>
       📅 ${fechaTxt} a las <strong>${t.hora} hs</strong><br>
@@ -1110,13 +1110,21 @@ async function cargarTurnoConfirmacion(turnoId){
       📍 San Rafael, Mendoza
     `;
 
-    // Si ya respondió, mostrar estado
+    // Si ya respondió antes, mostrar el estado guardado sin volver a preguntar
     if(t.estado==='presente'){
       mostrarRespuestaConfirmacion('presente', false);
     } else if(t.estado==='aca'){
       mostrarRespuestaConfirmacion('aca', false);
     } else if(t.estado==='asa'){
       mostrarRespuestaConfirmacion('asa', false);
+    } else {
+      // Link directo desde el mensaje de WhatsApp (?accion=presente o ?accion=asa):
+      // el link POR SÍ MISMO ya confirma o cancela, sin que el paciente tenga que
+      // tocar nada más al abrir la página.
+      const accionDirecta = urlParams.get('accion');
+      if(accionDirecta==='presente' || accionDirecta==='asa'){
+        responderConfirmacion(accionDirecta);
+      }
     }
   } catch(e){
     document.getElementById('cfBody').innerHTML = `<div style="color:#E24B4A">Error al cargar el turno: ${e.message}</div>`;
@@ -1576,8 +1584,9 @@ function renderRecordatorios(){
   const waIco='<svg width="16" height="16" viewBox="0 0 20 20" fill="#25D366"><path d="M10 1C5 1 1 5 1 10c0 1.8.5 3.4 1.3 4.8L1 19l4.3-1.3A9 9 0 1 0 10 1z"/></svg>';
   const mkRow=(t)=>{
     const p=gProf(t.profesionalId);
-    const linkConf = `https://institutoespejo.vercel.app/?confirmar=${t.id}`;
-    const msg=encodeURIComponent(`Hola ${(t.pacNombre||'').split(' ')[0]} 👋 Te recordamos tu turno en *Instituto Espejo* mañana *${labelF(t.fecha)}* a las *${t.hora} hs* con *${p?p.nom+' '+p.ape:'el profesional'}*.\n📍 San Rafael, Mendoza · ☎ ${TEL}\n\n👆 Confirmá tu asistencia tocando este link:\n${linkConf}\n\n¡Te esperamos! 😊`);
+    const linkConf = `https://institutoespejo.vercel.app/?confirmar=${t.id}&accion=presente`;
+    const linkCanc = `https://institutoespejo.vercel.app/?confirmar=${t.id}&accion=asa`;
+    const msg=encodeURIComponent(`Hola ${t.pacNombrePila || (t.pacNombre||'').split(' ')[0]} 👋 Te recordamos tu turno en *Instituto Espejo* mañana *${labelF(t.fecha)}* a las *${t.hora} hs* con *${p?p.nom+' '+p.ape:'el profesional'}*.\n📍 San Rafael, Mendoza · ☎ ${TEL}\n\n✅ Confirmar turno:\n${linkConf}\n\n🔴 Cancelar turno:\n${linkCanc}\n\n¡Te esperamos! 😊`);
     return `<div class="rec-row">
       <div class="rec-ico">${waIco}</div>
       <div style="flex:1;min-width:0">
@@ -1599,8 +1608,9 @@ function enviarTodosWA(){
   ts.forEach((t,i)=>{
     setTimeout(()=>{
       const p=gProf(t.profesionalId);
-      const linkConf = `https://institutoespejo.vercel.app/?confirmar=${t.id}`;
-    const msg=encodeURIComponent(`Hola ${(t.pacNombre||'').split(' ')[0]} 👋 Te recordamos tu turno en *Instituto Espejo* mañana *${labelF(t.fecha)}* a las *${t.hora} hs* con *${p?p.nom+' '+p.ape:'el profesional'}*.\n📍 San Rafael, Mendoza · ☎ ${TEL}\n\n👆 Confirmá tu asistencia tocando este link:\n${linkConf}\n\n¡Te esperamos! 😊`);
+      const linkConf = `https://institutoespejo.vercel.app/?confirmar=${t.id}&accion=presente`;
+      const linkCanc = `https://institutoespejo.vercel.app/?confirmar=${t.id}&accion=asa`;
+    const msg=encodeURIComponent(`Hola ${t.pacNombrePila || (t.pacNombre||'').split(' ')[0]} 👋 Te recordamos tu turno en *Instituto Espejo* mañana *${labelF(t.fecha)}* a las *${t.hora} hs* con *${p?p.nom+' '+p.ape:'el profesional'}*.\n📍 San Rafael, Mendoza · ☎ ${TEL}\n\n✅ Confirmar turno:\n${linkConf}\n\n🔴 Cancelar turno:\n${linkCanc}\n\n¡Te esperamos! 😊`);
       window.open(`https://wa.me/549${telLimpio(t.pacTel)}?text=${msg}`,'wa_instituto');
     },i*900);
   });
@@ -2033,6 +2043,7 @@ async function guardarTurno(){
       profesionalId: profId,
       pacienteId: pacId,
       pacNombre: (nom + ' ' + ape).trim(),
+      pacNombrePila: nom, // primer nombre, guardado aparte para el saludo del recordatorio (no depende de cómo se escribió pacNombre)
       pacTel: tel,
       fecha: fecha,
       hora: hora,
@@ -2183,6 +2194,7 @@ async function guardarSobreturnoRapido(){
       profesionalId: profId,
       pacienteId: pacId,
       pacNombre: (nom + ' ' + ape).trim(),
+      pacNombrePila: nom,
       pacTel: tel,
       fecha: fecha,
       hora: hora,
@@ -2240,7 +2252,7 @@ function verDetalle(id){
       <div style="font-size:10.5px;font-weight:600;color:var(--gm);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">Historial del paciente</div>
       ${historial.map(h=>{const hp=gProf(h.profesionalId);return `<div class="hist-row"><span style="min-width:90px;color:var(--gm)">${labelF(h.fecha)}</span><span style="flex:1">${hp?.ape||'—'} · ${h.servicio||'—'}</span>${h.nota?`<span style="color:var(--ambar);font-style:italic;font-size:11px">${h.nota}</span>`:''}</div>`;}).join('')}
     </div>`:''}
-    <div class="wa-prev">Hola ${(t.pacNombre||'').split(' ')[0]} 👋 Te recordamos tu turno en Instituto Espejo el ${labelF(t.fecha)} a las ${t.hora} hs con ${p?p.nom+' '+p.ape:'el profesional'}.<br>📍 San Rafael, Mendoza · ☎ ${TEL}<br><br>Por favor confirmanos tu asistencia respondiendo este mensaje:<br>✅ <strong>SI</strong> — Confirmo que asistiré<br>❌ <strong>NO</strong> — No voy a poder asistir<br><br>¡Te esperamos! 😊</div>
+    <div class="wa-prev">Hola ${t.pacNombrePila || (t.pacNombre||'').split(' ')[0]} 👋 Te recordamos tu turno en Instituto Espejo el ${labelF(t.fecha)} a las ${t.hora} hs con ${p?p.nom+' '+p.ape:'el profesional'}.<br>📍 San Rafael, Mendoza · ☎ ${TEL}<br><br>✅ <strong>Confirmar turno:</strong><br>https://institutoespejo.vercel.app/?confirmar=${t.id}&accion=presente<br><br>🔴 <strong>Cancelar turno:</strong><br>https://institutoespejo.vercel.app/?confirmar=${t.id}&accion=asa<br><br>¡Te esperamos! 😊</div>
     <div class="frow" style="margin-top:.75rem">
       <div><label class="flbl">Obra social</label><input class="finput" id="detObraSocial" style="margin-top:4px;text-transform:uppercase" value="${t.obraSocial||''}"></div>
       <div><label class="flbl">Observaciones</label><input class="finput" id="detObs" style="margin-top:4px;text-transform:uppercase" value="${t.observaciones||''}"></div>
@@ -2277,8 +2289,9 @@ function verDetalle(id){
     <button class="btn-p" onclick="guardarDetalle('${t.id}')">💾 Guardar</button>
     ${t.pacTel?(()=>{
       const p2=gProf(t.profesionalId);
-      const linkConf3 = 'https://institutoespejo.vercel.app/?confirmar='+t.id;
-      const msg=encodeURIComponent('Hola '+t.pacNombre.split(' ')[0]+' 👋 Te recordamos tu turno en *Instituto Espejo* el *'+labelF(t.fecha)+'* a las *'+t.hora+' hs* con *'+(p2?p2.nom+' '+p2.ape:'el profesional')+'*.\n📍 San Rafael, Mendoza · ☎ '+TEL+'\n\n👆 Confirmá tu asistencia tocando este link:\n'+linkConf3+'\n\n¡Te esperamos! 😊');
+      const linkConf3 = 'https://institutoespejo.vercel.app/?confirmar='+t.id+'&accion=presente';
+      const linkCanc3 = 'https://institutoespejo.vercel.app/?confirmar='+t.id+'&accion=asa';
+      const msg=encodeURIComponent('Hola '+(t.pacNombrePila || t.pacNombre.split(' ')[0])+' 👋 Te recordamos tu turno en *Instituto Espejo* el *'+labelF(t.fecha)+'* a las *'+t.hora+' hs* con *'+(p2?p2.nom+' '+p2.ape:'el profesional')+'*.\n📍 San Rafael, Mendoza · ☎ '+TEL+'\n\n✅ Confirmar turno:\n'+linkConf3+'\n\n🔴 Cancelar turno:\n'+linkCanc3+'\n\n¡Te esperamos! 😊');
       return `<a href="https://wa.me/549${telLimpio(t.pacTel)}?text=${msg}" target="wa_instituto" class="btn-wa">WA</a>`;
     })():''}
   `;
