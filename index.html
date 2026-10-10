@@ -865,10 +865,10 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
         <button onclick="responderConfirmacion('presente')" style="background:#1D9E75;border:none;color:white;border-radius:10px;padding:14px;font-size:15px;font-weight:500;cursor:pointer;font-family:'Inter',sans-serif">
           ✅ Sí, voy a asistir
         </button>
-        <button onclick="responderConfirmacion('aca')" style="background:#BA7517;border:none;color:white;border-radius:10px;padding:14px;font-size:15px;font-weight:500;cursor:pointer;font-family:'Inter',sans-serif">
+        <button onclick="responderConfirmacion('reprogramar')" style="background:#BA7517;border:none;color:white;border-radius:10px;padding:14px;font-size:15px;font-weight:500;cursor:pointer;font-family:'Inter',sans-serif">
           📅 No puedo — quiero reprogramar
         </button>
-        <button onclick="responderConfirmacion('asa')" style="background:#E24B4A;border:none;color:white;border-radius:10px;padding:14px;font-size:15px;font-weight:500;cursor:pointer;font-family:'Inter',sans-serif">
+        <button onclick="responderConfirmacion('cancelar')" style="background:#E24B4A;border:none;color:white;border-radius:10px;padding:14px;font-size:15px;font-weight:500;cursor:pointer;font-family:'Inter',sans-serif">
           ❌ No voy a asistir
         </button>
       </div>
@@ -1072,12 +1072,24 @@ function generarSlotsUrgente(profId, fecha){
 const urlParams = new URLSearchParams(window.location.search);
 const turnoConfirmarId = urlParams.get('confirmar');
 
+// Qué estado queda guardado en el turno según lo que responda el paciente.
+// Cancelar y reprogramar son "ausente CON aviso" (aca): el paciente avisó.
+const ESTADO_POR_RESPUESTA = { presente:'presente', reprogramar:'aca', cancelar:'aca' };
+// Link directo del mensaje de WhatsApp (?accion=...). "asa" se acepta porque hay
+// mensajes ya enviados con el link viejo de cancelar: también cuentan como cancelar.
+const ACCIONES_DIRECTAS = { presente:'presente', cancelar:'cancelar', asa:'cancelar' };
+const accionDirecta = ACCIONES_DIRECTAS[urlParams.get('accion')] || null;
+
 if(turnoConfirmarId){
   // Ocultar login y app, mostrar solo confirmación pública (sin auth)
   document.getElementById('pgLogin').style.display='none';
   document.getElementById('pgApp').style.display='none';
   document.getElementById('pgConfirmar').style.display='flex';
-  // Inicializar Firebase solo para leer/escribir el turno (sin auth)
+  if(accionDirecta){
+    // Desde el primer instante mostramos un estado neutro, así nunca se ve
+    // la pantalla de los 3 botones antes del resultado.
+    document.getElementById('cfBody').innerHTML = '<div style="font-size:2.5rem;margin-bottom:.75rem">⏳</div><div style="font-size:15px;color:#555">Registrando tu respuesta…</div>';
+  }
   cargarTurnoConfirmacion(turnoConfirmarId);
 } else {
   // App normal con auth
@@ -1097,12 +1109,26 @@ async function cargarTurnoConfirmacion(turnoId){
       return;
     }
     const t = snap.data();
+
+    // ── Link directo (Confirmar / Cancelar del mensaje): sin pantalla intermedia ──
+    if(accionDirecta){
+      if(accionDirecta==='presente' && t.estado==='presente'){
+        mostrarRespuestaConfirmacion('presente', false);
+      } else if(accionDirecta==='cancelar' && t.estado==='aca'){
+        mostrarRespuestaConfirmacion('cancelar', false);
+      } else {
+        // Si ya había respondido otra cosa (ej: confirmó y después cancela), se actualiza.
+        await responderConfirmacion(accionDirecta);
+      }
+      return;
+    }
+
+    // ── Entrada sin acción (link viejo): pantalla con los 3 botones ──
     const MESES_CF = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
     const d = new Date(t.fecha+'T00:00:00');
     const fechaTxt = `${d.getDate()} de ${MESES_CF[d.getMonth()]} ${d.getFullYear()}`;
 
-    // Obtener profesional (simplificado — buscamos en los datos del turno)
-    document.getElementById('cfNombre').textContent = `Hola, ${t.pacNombrePila || (t.pacNombre||'').split(' ')[0]} 👋`;
+    document.getElementById('cfNombre').textContent = `Hola, ${t.pacNombre||''} 👋`;
     document.getElementById('cfDetalle').innerHTML = `
       <strong>Tu turno:</strong><br>
       📅 ${fechaTxt} a las <strong>${t.hora} hs</strong><br>
@@ -1114,17 +1140,9 @@ async function cargarTurnoConfirmacion(turnoId){
     if(t.estado==='presente'){
       mostrarRespuestaConfirmacion('presente', false);
     } else if(t.estado==='aca'){
-      mostrarRespuestaConfirmacion('aca', false);
+      mostrarRespuestaConfirmacion('avisado', false);
     } else if(t.estado==='asa'){
-      mostrarRespuestaConfirmacion('asa', false);
-    } else {
-      // Link directo desde el mensaje de WhatsApp (?accion=presente o ?accion=asa):
-      // el link POR SÍ MISMO ya confirma o cancela, sin que el paciente tenga que
-      // tocar nada más al abrir la página.
-      const accionDirecta = urlParams.get('accion');
-      if(accionDirecta==='presente' || accionDirecta==='asa'){
-        responderConfirmacion(accionDirecta);
-      }
+      mostrarRespuestaConfirmacion('cancelar', false);
     }
   } catch(e){
     document.getElementById('cfBody').innerHTML = `<div style="color:#E24B4A">Error al cargar el turno: ${e.message}</div>`;
@@ -1134,7 +1152,7 @@ async function cargarTurnoConfirmacion(turnoId){
 async function responderConfirmacion(respuesta){
   try {
     await db.collection('turnos').doc(turnoConfirmarId).update({
-      estado: respuesta,
+      estado: ESTADO_POR_RESPUESTA[respuesta] || respuesta,
       respondioEn: firebase.firestore.FieldValue.serverTimestamp()
     });
     mostrarRespuestaConfirmacion(respuesta, true);
@@ -1145,9 +1163,10 @@ async function responderConfirmacion(respuesta){
 
 function mostrarRespuestaConfirmacion(respuesta, nuevo){
   const msgs = {
-    presente: { ico:'✅', tit:'¡Perfecto!', txt:'Tu asistencia quedó confirmada. ¡Te esperamos!', color:'#1D9E75' },
-    aca:      { ico:'📅', tit:'Entendido', txt:'Anotamos que necesitás reprogramar. La clínica se va a comunicar con vos a la brevedad.', color:'#BA7517' },
-    asa:      { ico:'❌', tit:'Turno cancelado', txt:'Lamentamos que no puedas asistir. Cuando quieras podés pedir un nuevo turno.', color:'#E24B4A' },
+    presente:    { ico:'✅', tit:'¡Turno confirmado!', txt:'Tu asistencia quedó confirmada. ¡Te esperamos!', color:'#1D9E75' },
+    cancelar:    { ico:'❌', tit:'Turno cancelado', txt:'Lamentamos que no puedas asistir. Cuando quieras podés pedir un nuevo turno.', color:'#E24B4A' },
+    reprogramar: { ico:'📅', tit:'Entendido', txt:'Anotamos que necesitás reprogramar. La clínica se va a comunicar con vos a la brevedad.', color:'#BA7517' },
+    avisado:     { ico:'📅', tit:'Respuesta registrada', txt:'Ya nos avisaste que no vas a poder asistir. Si necesitás reprogramar, la clínica se va a comunicar con vos.', color:'#BA7517' },
   };
   const m = msgs[respuesta]||msgs.presente;
   document.getElementById('cfBody').innerHTML = `
@@ -1585,15 +1604,15 @@ function renderRecordatorios(){
   const mkRow=(t)=>{
     const p=gProf(t.profesionalId);
     const linkConf = `https://institutoespejo.vercel.app/?confirmar=${t.id}&accion=presente`;
-    const linkCanc = `https://institutoespejo.vercel.app/?confirmar=${t.id}&accion=asa`;
-    const msg=encodeURIComponent(`Hola ${t.pacNombrePila || (t.pacNombre||'').split(' ')[0]} 👋 Te recordamos tu turno en *Instituto Espejo* mañana *${labelF(t.fecha)}* a las *${t.hora} hs* con *${p?p.nom+' '+p.ape:'el profesional'}*.\n📍 San Rafael, Mendoza · ☎ ${TEL}\n\n✅ Confirmar turno:\n${linkConf}\n\n🔴 Cancelar turno:\n${linkCanc}\n\n¡Te esperamos! 😊`);
+    const linkCanc = `https://institutoespejo.vercel.app/?confirmar=${t.id}&accion=cancelar`;
+    const msg=encodeURIComponent(`Hola ${t.pacNombre||''} 👋 Te recordamos tu turno en *Instituto Espejo* mañana *${labelF(t.fecha)}* a las *${t.hora} hs* con *${p?p.nom+' '+p.ape:'el profesional'}*.\n📍 San Rafael, Mendoza · ☎ ${TEL}\n\n✅ Confirmar turno:\n${linkConf}\n\n🔴 Cancelar turno:\n${linkCanc}\n\n¡Te esperamos! 😊`);
     return `<div class="rec-row">
       <div class="rec-ico">${waIco}</div>
       <div style="flex:1;min-width:0">
         <div style="font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.pacNombre||'—'}</div>
         <div style="font-size:10.5px;color:var(--gm)">${t.hora} · ${p?p.ape:''}</div>
       </div>
-      ${t.pacTel?`<a href="https://wa.me/549${telLimpio(t.pacTel)}?text=${msg}" target="wa_instituto" class="btn-wa-sm">WA</a>`:''}
+      ${t.pacTel?`<a href="https://web.whatsapp.com/send?phone=549${telLimpio(t.pacTel)}&text=${msg}" target="wa_instituto" class="btn-wa-sm">WA</a>`:''}
     </div>`;
   };
   document.getElementById('recSbEl').innerHTML=ts.slice(0,4).map(mkRow).join('')+(ts.length>4?`<div style="padding:.5rem;font-size:12px;color:var(--gm);text-align:center">+${ts.length-4} más</div>`:'');
@@ -1609,9 +1628,9 @@ function enviarTodosWA(){
     setTimeout(()=>{
       const p=gProf(t.profesionalId);
       const linkConf = `https://institutoespejo.vercel.app/?confirmar=${t.id}&accion=presente`;
-      const linkCanc = `https://institutoespejo.vercel.app/?confirmar=${t.id}&accion=asa`;
-    const msg=encodeURIComponent(`Hola ${t.pacNombrePila || (t.pacNombre||'').split(' ')[0]} 👋 Te recordamos tu turno en *Instituto Espejo* mañana *${labelF(t.fecha)}* a las *${t.hora} hs* con *${p?p.nom+' '+p.ape:'el profesional'}*.\n📍 San Rafael, Mendoza · ☎ ${TEL}\n\n✅ Confirmar turno:\n${linkConf}\n\n🔴 Cancelar turno:\n${linkCanc}\n\n¡Te esperamos! 😊`);
-      window.open(`https://wa.me/549${telLimpio(t.pacTel)}?text=${msg}`,'wa_instituto');
+      const linkCanc = `https://institutoespejo.vercel.app/?confirmar=${t.id}&accion=cancelar`;
+    const msg=encodeURIComponent(`Hola ${t.pacNombre||''} 👋 Te recordamos tu turno en *Instituto Espejo* mañana *${labelF(t.fecha)}* a las *${t.hora} hs* con *${p?p.nom+' '+p.ape:'el profesional'}*.\n📍 San Rafael, Mendoza · ☎ ${TEL}\n\n✅ Confirmar turno:\n${linkConf}\n\n🔴 Cancelar turno:\n${linkCanc}\n\n¡Te esperamos! 😊`);
+      window.open(`https://web.whatsapp.com/send?phone=549${telLimpio(t.pacTel)}&text=${msg}`,'wa_instituto');
     },i*900);
   });
   toast(`Abriendo ${ts.length} chats de WhatsApp...`,'wa');
@@ -2043,7 +2062,6 @@ async function guardarTurno(){
       profesionalId: profId,
       pacienteId: pacId,
       pacNombre: (nom + ' ' + ape).trim(),
-      pacNombrePila: nom, // primer nombre, guardado aparte para el saludo del recordatorio (no depende de cómo se escribió pacNombre)
       pacTel: tel,
       fecha: fecha,
       hora: hora,
@@ -2194,7 +2212,6 @@ async function guardarSobreturnoRapido(){
       profesionalId: profId,
       pacienteId: pacId,
       pacNombre: (nom + ' ' + ape).trim(),
-      pacNombrePila: nom,
       pacTel: tel,
       fecha: fecha,
       hora: hora,
@@ -2252,7 +2269,7 @@ function verDetalle(id){
       <div style="font-size:10.5px;font-weight:600;color:var(--gm);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">Historial del paciente</div>
       ${historial.map(h=>{const hp=gProf(h.profesionalId);return `<div class="hist-row"><span style="min-width:90px;color:var(--gm)">${labelF(h.fecha)}</span><span style="flex:1">${hp?.ape||'—'} · ${h.servicio||'—'}</span>${h.nota?`<span style="color:var(--ambar);font-style:italic;font-size:11px">${h.nota}</span>`:''}</div>`;}).join('')}
     </div>`:''}
-    <div class="wa-prev">Hola ${t.pacNombrePila || (t.pacNombre||'').split(' ')[0]} 👋 Te recordamos tu turno en Instituto Espejo el ${labelF(t.fecha)} a las ${t.hora} hs con ${p?p.nom+' '+p.ape:'el profesional'}.<br>📍 San Rafael, Mendoza · ☎ ${TEL}<br><br>✅ <strong>Confirmar turno:</strong><br>https://institutoespejo.vercel.app/?confirmar=${t.id}&accion=presente<br><br>🔴 <strong>Cancelar turno:</strong><br>https://institutoespejo.vercel.app/?confirmar=${t.id}&accion=asa<br><br>¡Te esperamos! 😊</div>
+    <div class="wa-prev">Hola ${t.pacNombre||''} 👋 Te recordamos tu turno en Instituto Espejo el ${labelF(t.fecha)} a las ${t.hora} hs con ${p?p.nom+' '+p.ape:'el profesional'}.<br>📍 San Rafael, Mendoza · ☎ ${TEL}<br><br>✅ <strong>Confirmar turno:</strong><br>https://institutoespejo.vercel.app/?confirmar=${t.id}&accion=presente<br><br>🔴 <strong>Cancelar turno:</strong><br>https://institutoespejo.vercel.app/?confirmar=${t.id}&accion=cancelar<br><br>¡Te esperamos! 😊</div>
     <div class="frow" style="margin-top:.75rem">
       <div><label class="flbl">Obra social</label><input class="finput" id="detObraSocial" style="margin-top:4px;text-transform:uppercase" value="${t.obraSocial||''}"></div>
       <div><label class="flbl">Observaciones</label><input class="finput" id="detObs" style="margin-top:4px;text-transform:uppercase" value="${t.observaciones||''}"></div>
@@ -2290,9 +2307,9 @@ function verDetalle(id){
     ${t.pacTel?(()=>{
       const p2=gProf(t.profesionalId);
       const linkConf3 = 'https://institutoespejo.vercel.app/?confirmar='+t.id+'&accion=presente';
-      const linkCanc3 = 'https://institutoespejo.vercel.app/?confirmar='+t.id+'&accion=asa';
-      const msg=encodeURIComponent('Hola '+(t.pacNombrePila || t.pacNombre.split(' ')[0])+' 👋 Te recordamos tu turno en *Instituto Espejo* el *'+labelF(t.fecha)+'* a las *'+t.hora+' hs* con *'+(p2?p2.nom+' '+p2.ape:'el profesional')+'*.\n📍 San Rafael, Mendoza · ☎ '+TEL+'\n\n✅ Confirmar turno:\n'+linkConf3+'\n\n🔴 Cancelar turno:\n'+linkCanc3+'\n\n¡Te esperamos! 😊');
-      return `<a href="https://wa.me/549${telLimpio(t.pacTel)}?text=${msg}" target="wa_instituto" class="btn-wa">WA</a>`;
+      const linkCanc3 = 'https://institutoespejo.vercel.app/?confirmar='+t.id+'&accion=cancelar';
+      const msg=encodeURIComponent('Hola '+t.pacNombre+' 👋 Te recordamos tu turno en *Instituto Espejo* el *'+labelF(t.fecha)+'* a las *'+t.hora+' hs* con *'+(p2?p2.nom+' '+p2.ape:'el profesional')+'*.\n📍 San Rafael, Mendoza · ☎ '+TEL+'\n\n✅ Confirmar turno:\n'+linkConf3+'\n\n🔴 Cancelar turno:\n'+linkCanc3+'\n\n¡Te esperamos! 😊');
+      return `<a href="https://web.whatsapp.com/send?phone=549${telLimpio(t.pacTel)}&text=${msg}" target="wa_instituto" class="btn-wa">WA</a>`;
     })():''}
   `;
   if(t.labNombre){ poblarLabSelect('detLab'); document.getElementById('detLab').value=t.labNombre; }
