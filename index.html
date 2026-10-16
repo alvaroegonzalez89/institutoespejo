@@ -949,8 +949,9 @@ let LABORATORIOS = ['Naspi','Yebra','Paula','Natalia','Mauricio'];
 // Ventana de fechas que se mantiene sincronizada en vivo (evita traer TODA la
 // colección de turnos para siempre). La ficha de paciente consulta historial
 // completo por separado, así que esto no le afecta.
-const VENTANA_DIAS_ATRAS    = 120; // ~4 meses hacia atrás
-const VENTANA_DIAS_ADELANTE = 180; // ~6 meses hacia adelante
+const VENTANA_DIAS_ATRAS    = 14; // 2 semanas hacia atrás
+const VENTANA_DIAS_ADELANTE = 90; // ~3 meses hacia adelante
+// Semanas fuera de esta ventana se leen aparte, solo mientras se miran (ver asegurarRango).
 
 // Estado
 let profs     = JSON.parse(JSON.stringify(PROFS_INIT));
@@ -975,6 +976,17 @@ let unsubTurnos  = null;
 let unsubPacs    = null;
 let unsubProfsCfg = null;
 let unsubFeriados = null;
+// Ventanas de turnos: así se lee de Firestore SOLO lo que se está mirando.
+//  base : hoy-14 … hoy+90, siempre activa
+//  vista: la semana que se mira, solo si cae fuera de la base
+//  modal: la fecha elegida en Nuevo turno / Anular horario, solo si cae fuera
+const ventanasTurnos = {
+  base:  {desde:'', hasta:'', unsub:null, docs:[], listo:false},
+  vista: {desde:'', hasta:'', unsub:null, docs:[], listo:false},
+  modal: {desde:'', hasta:'', unsub:null, docs:[], listo:false},
+};
+let pacientesCargados = false;
+let pacientesPromesa = null;
 let diaAmpFecha  = ''; // fecha actualmente mostrada en la vista de día ampliada
 let diaAmpProfId = ''; // profesional actualmente mostrado en la vista de día ampliada
 
@@ -1203,52 +1215,125 @@ function doLogin(){
   auth.signInWithEmailAndPassword('clinica@espejo.com','espejo2026')
     .catch(e=>{ err.textContent='Error: '+e.message; });
 }
-function doLogout(){ if(unsubTurnos)unsubTurnos(); if(unsubPacs)unsubPacs(); if(unsubProfsCfg)unsubProfsCfg(); if(unsubFeriados)unsubFeriados(); auth.signOut(); }
+function doLogout(){ detenerListeners(); auth.signOut(); }
 
 // ── LISTENERS FIRESTORE ───────────────────────────────────────
-function iniciarListeners(){
-  // Ventana de fechas: rango con dos filtros sobre el MISMO campo ('fecha'),
-  // lo cual NO requiere índice compuesto en Firestore (a diferencia de
-  // combinar where + orderBy en campos distintos, que sí lo pedía antes).
-  const hoy = new Date();
-  const desde = new Date(hoy); desde.setDate(desde.getDate()-VENTANA_DIAS_ATRAS);
-  const hasta = new Date(hoy); hasta.setDate(hasta.getDate()+VENTANA_DIAS_ADELANTE);
-  const desdeStr = fStr(desde), hastaStr = fStr(hasta);
+function sumarDiasStr(fecha, n){
+  const d = new Date(fecha+'T00:00:00'); d.setDate(d.getDate()+n); return fStr(d);
+}
 
-  unsubTurnos = db.collection('turnos')
-    .where('fecha','>=',desdeStr)
-    .where('fecha','<=',hastaStr)
+function rangoBaseTurnos(){
+  const hoy = new Date();
+  const d = new Date(hoy); d.setDate(d.getDate()-VENTANA_DIAS_ATRAS);
+  const h = new Date(hoy); h.setDate(h.getDate()+VENTANA_DIAS_ADELANTE);
+  return {desde:fStr(d), hasta:fStr(h)};
+}
+
+// Une las ventanas en la lista única "turnos" que usa todo el sistema
+function combinarTurnos(){
+  const mapa = new Map();
+  ['base','vista','modal'].forEach(k=>ventanasTurnos[k].docs.forEach(t=>mapa.set(t.id,t)));
+  turnos = [...mapa.values()];
+  turnos.sort((a,b)=> a.fecha===b.fecha ? (a.hora||'').localeCompare(b.hora||'') : a.fecha.localeCompare(b.fecha));
+}
+
+function refrescarVistasTurnos(){
+  renderAgenda();
+  renderTurnosHoy();
+  renderRecordatorios();
+  actualizarStats();
+  renderMiniCal();
+  if(profSelDoc) renderVistaMedico();
+  if(diaAmpFecha && diaAmpProfId) renderDiaAmpliado();
+}
+
+// Abre (o cierra, si desde='') una ventana de turnos
+function suscribirVentana(clave, desde, hasta){
+  const v = ventanasTurnos[clave];
+  if(v.unsub){ v.unsub(); v.unsub=null; }
+  v.listo = false;
+  if(!desde){ v.desde=''; v.hasta=''; v.docs=[]; combinarTurnos(); return; }
+  v.desde = desde; v.hasta = hasta;
+  v.unsub = db.collection('turnos')
+    .where('fecha','>=',desde)
+    .where('fecha','<=',hasta)
     .onSnapshot(snap=>{
-      turnos = snap.docs.map(d=>({...d.data(), id:d.id}));
-      // ordenar en cliente
-      turnos.sort((a,b)=> a.fecha===b.fecha ? a.hora.localeCompare(b.hora) : a.fecha.localeCompare(b.fecha));
-      renderAgenda();
-      renderTurnosHoy();
-      renderRecordatorios();
-      actualizarStats();
-      renderMiniCal();
-      if(profSelDoc) renderVistaMedico();
-      if(diaAmpFecha && diaAmpProfId) renderDiaAmpliado();
+      const primera = !v.listo;
+      v.docs = snap.docs.map(d=>({...d.data(), id:d.id}));
+      v.listo = true;
+      if(primera) console.info(`[Firestore] ventana "${clave}" ${desde} → ${hasta}: ${v.docs.length} turnos leídos`);
+      combinarTurnos();
+      refrescarVistasTurnos();
+      if(primera && (clave==='base' || clave==='modal')){
+        if(document.getElementById('mNuevo').classList.contains('open')) actualizarSlots();
+        if(document.getElementById('mBloquear').classList.contains('open')) actualizarSlotsBloqueo();
+      }
     }, err=>{
-      console.error('onSnapshot turnos error:', err);
-      if(err.code==='permission-denied' && !window._reintentoTurnos){
-        // Reintento silencioso una sola vez (posible token todavía no listo)
+      console.error('onSnapshot turnos ('+clave+') error:', err);
+      if(err.code==='permission-denied' && clave==='base' && !window._reintentoTurnos){
+        // Reintento silencioso una sola vez (posible token todavía no listo) — solo de ESTA ventana
         window._reintentoTurnos = true;
-        setTimeout(()=>iniciarListeners(), 1200);
+        setTimeout(()=>suscribirVentana(clave, desde, hasta), 1200);
         return;
       }
       toast('Error de conexión: '+err.message, 'err');
     });
+}
 
-  unsubPacs = db.collection('pacientes')
-    .onSnapshot(snap=>{
-      pacientes = snap.docs.map(d=>({...d.data(), id:d.id}));
-      pacientes.sort((a,b)=>(a.ape||'').localeCompare(b.ape||''));
-      renderPacientes();
-    }, err=>{
-      console.error('onSnapshot pacientes error:', err);
-      toast('Error cargando pacientes: '+err.message, 'err');
-    });
+// Se asegura de tener cargado el rango [desde,hasta]. Devuelve true si ya está listo para mostrar.
+function asegurarRango(clave, desde, hasta){
+  const base = ventanasTurnos.base;
+  if(!base.desde) return false; // todavía no arrancó la ventana base
+  if(desde>=base.desde && hasta<=base.hasta){
+    if(ventanasTurnos[clave].desde) suscribirVentana(clave,'',''); // la extra ya no hace falta: se libera
+    return base.listo;
+  }
+  const v = ventanasTurnos[clave];
+  if(v.desde && desde>=v.desde && hasta<=v.hasta) return v.listo;
+  suscribirVentana(clave, sumarDiasStr(desde,-3), sumarDiasStr(hasta,3));
+  return false;
+}
+
+function detenerListeners(){
+  ['base','vista','modal'].forEach(k=>{
+    const v = ventanasTurnos[k];
+    if(v.unsub){ v.unsub(); v.unsub=null; }
+    v.desde=''; v.hasta=''; v.docs=[]; v.listo=false;
+  });
+  turnos = [];
+  if(unsubPacs){ unsubPacs(); unsubPacs=null; }
+  pacientes = []; pacientesCargados = false; pacientesPromesa = null;
+  if(unsubProfsCfg){ unsubProfsCfg(); unsubProfsCfg=null; }
+  if(unsubFeriados){ unsubFeriados(); unsubFeriados=null; }
+}
+
+// Los pacientes se cargan recién cuando hacen falta (Nuevo turno, Sobreturno,
+// pestaña Pacientes). Quien solo mira la agenda no los lee.
+function asegurarPacientes(){
+  if(pacientesPromesa) return pacientesPromesa;
+  pacientesPromesa = new Promise(resolve=>{
+    unsubPacs = db.collection('pacientes')
+      .onSnapshot(snap=>{
+        const primera = !pacientesCargados;
+        pacientes = snap.docs.map(d=>({...d.data(), id:d.id}));
+        pacientes.sort((a,b)=>(a.ape||'').localeCompare(b.ape||''));
+        pacientesCargados = true;
+        if(primera){ console.info(`[Firestore] pacientes leídos: ${pacientes.length}`); resolve(); }
+        if(document.getElementById('vPac').style.display==='flex') renderPacientes();
+      }, err=>{
+        console.error('onSnapshot pacientes error:', err);
+        toast('Error cargando pacientes: '+err.message, 'err');
+        pacientesPromesa = null;
+        resolve();
+      });
+  });
+  return pacientesPromesa;
+}
+
+function iniciarListeners(){
+  detenerListeners(); // nunca dejar listeners duplicados (cada uno lee todo de nuevo)
+  const r = rangoBaseTurnos();
+  suscribirVentana('base', r.desde, r.hasta);
 
   // Configuración editable de profesionales (horarios, ausencias, datos básicos):
   // antes vivía SOLO en memoria y se perdía al recargar. Ahora persiste en Firestore.
@@ -1461,6 +1546,11 @@ function renderAgenda(){
   }
   if(lbl) lbl.textContent = `${p.ape}${p.nom?', '+p.nom:''}`;
 
+  if(!asegurarRango('vista', fStr(lunes), fStr(vie))){
+    wrap.innerHTML = '<div class="empty">Cargando turnos…</div>';
+    return;
+  }
+
   let cols='';
   for(let i=0;i<5;i++){
     const d=new Date(lunes); d.setDate(lunes.getDate()+i);
@@ -1612,7 +1702,7 @@ function renderRecordatorios(){
         <div style="font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.pacNombre||'—'}</div>
         <div style="font-size:10.5px;color:var(--gm)">${t.hora} · ${p?p.ape:''}</div>
       </div>
-      ${t.pacTel?`<a href="https://web.whatsapp.com/send?phone=549${telLimpio(t.pacTel)}&text=${msg}" target="wa_instituto" class="btn-wa-sm">WA</a>`:''}
+      ${t.pacTel?`<a href="https://wa.me/549${telLimpio(t.pacTel)}?text=${msg}" target="wa_instituto" class="btn-wa-sm">WA</a>`:''}
     </div>`;
   };
   document.getElementById('recSbEl').innerHTML=ts.slice(0,4).map(mkRow).join('')+(ts.length>4?`<div style="padding:.5rem;font-size:12px;color:var(--gm);text-align:center">+${ts.length-4} más</div>`:'');
@@ -1630,7 +1720,7 @@ function enviarTodosWA(){
       const linkConf = `https://institutoespejo.vercel.app/?confirmar=${t.id}&accion=presente`;
       const linkCanc = `https://institutoespejo.vercel.app/?confirmar=${t.id}&accion=cancelar`;
     const msg=encodeURIComponent(`Hola ${t.pacNombre||''} 👋 Te recordamos tu turno en *Instituto Espejo* mañana *${labelF(t.fecha)}* a las *${t.hora} hs* con *${p?p.nom+' '+p.ape:'el profesional'}*.\n📍 San Rafael, Mendoza · ☎ ${TEL}\n\n✅ Confirmar turno:\n${linkConf}\n\n🔴 Cancelar turno:\n${linkCanc}\n\n¡Te esperamos! 😊`);
-      window.open(`https://web.whatsapp.com/send?phone=549${telLimpio(t.pacTel)}&text=${msg}`,'wa_instituto');
+      window.open(`https://wa.me/549${telLimpio(t.pacTel)}?text=${msg}`,'wa_instituto');
     },i*900);
   });
   toast(`Abriendo ${ts.length} chats de WhatsApp...`,'wa');
@@ -1777,6 +1867,7 @@ function irAFechaDoc(f){
 
 // ── NUEVO TURNO ───────────────────────────────────────────────
 function abrirNuevoTurno(fecha='', hora='', profId=null){
+  asegurarPacientes();
   turnoEditId=null; pacSelModal=null;
   // Limpiar
   ['nNom','nApe','nDni','nTel','nServ','nNota','nObraSocial','nObs'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
@@ -1832,6 +1923,11 @@ function actualizarSlots(){
   if(!(manualOn && manualVal)) document.querySelectorAll('.slot-btn').forEach(b=>b.classList.remove('sel'));
   if(!profId||!fecha){
     grid.innerHTML='<div class="slot-none">Seleccioná profesional y fecha</div>';
+    return;
+  }
+
+  if(!asegurarRango('modal', fecha, fecha)){
+    grid.innerHTML='<div class="slot-none">Cargando horarios…</div>';
     return;
   }
 
@@ -1969,6 +2065,7 @@ function buscarEnModalCampos(){
   const res=document.getElementById('nBusRes');
   const q=`${ape} ${nom}`.trim();
   if(q.length<2 && dni.length<3){ res.style.display='none'; return; }
+  if(!pacientesCargados){ res.innerHTML='<div class="bus-item" style="color:var(--gm)">Cargando pacientes…</div>'; res.style.display='block'; asegurarPacientes().then(()=>buscarEnModalCampos()); return; }
   const hits=pacientes.filter(p=>{
     const nombreCompleto=`${p.ape||''} ${p.nom||''}`.toLowerCase();
     const matchNombre = q.length>=2 && nombreCompleto.includes(q.toLowerCase());
@@ -1996,6 +2093,7 @@ function selPacEnModal(id){
 
 async function guardarTurno(){
   try {
+    await asegurarPacientes();
     const profId = document.getElementById('nProf').value;
     const fecha  = document.getElementById('nFecha').value;
     const hora   = document.getElementById('nHora').value;
@@ -2123,6 +2221,7 @@ let srPacSelId = null;
 let srCtx = {fecha:'', profId:''};
 
 function abrirSobreturnoRapido(fecha, hora, profId){
+  asegurarPacientes();
   srCtx = {fecha, profId};
   srPacSelId = null;
   const p = gProf(profId);
@@ -2147,6 +2246,7 @@ function abrirSobreturnoRapido(fecha, hora, profId){
 function buscarEnModalSR(q){
   const res=document.getElementById('srBusRes');
   if(!q||q.length<2){res.style.display='none';return;}
+  if(!pacientesCargados){ res.innerHTML='<div class="bus-item" style="color:var(--gm)">Cargando pacientes…</div>'; res.style.display='block'; asegurarPacientes().then(()=>buscarEnModalSR(document.getElementById('srBus').value)); return; }
   const hits=pacientes.filter(p=>`${p.ape||''} ${p.nom||''}`.toLowerCase().includes(q.toLowerCase())||(p.dni&&p.dni.includes(q))).slice(0,6);
   if(!hits.length){res.innerHTML='<div class="bus-item" style="color:var(--gm)">Sin resultados</div>';res.style.display='block';return;}
   res.innerHTML=hits.map(p=>`<div class="bus-item" onclick="selPacEnModalSR('${p.id}')">
@@ -2170,6 +2270,7 @@ function selPacEnModalSR(id){
 
 async function guardarSobreturnoRapido(){
   try {
+    await asegurarPacientes();
     const {fecha, profId} = srCtx;
     const hora = document.getElementById('srHora').value;
     const nom  = document.getElementById('srNom').value.trim().toUpperCase();
@@ -2309,7 +2410,7 @@ function verDetalle(id){
       const linkConf3 = 'https://institutoespejo.vercel.app/?confirmar='+t.id+'&accion=presente';
       const linkCanc3 = 'https://institutoespejo.vercel.app/?confirmar='+t.id+'&accion=cancelar';
       const msg=encodeURIComponent('Hola '+t.pacNombre+' 👋 Te recordamos tu turno en *Instituto Espejo* el *'+labelF(t.fecha)+'* a las *'+t.hora+' hs* con *'+(p2?p2.nom+' '+p2.ape:'el profesional')+'*.\n📍 San Rafael, Mendoza · ☎ '+TEL+'\n\n✅ Confirmar turno:\n'+linkConf3+'\n\n🔴 Cancelar turno:\n'+linkCanc3+'\n\n¡Te esperamos! 😊');
-      return `<a href="https://web.whatsapp.com/send?phone=549${telLimpio(t.pacTel)}&text=${msg}" target="wa_instituto" class="btn-wa">WA</a>`;
+      return `<a href="https://wa.me/549${telLimpio(t.pacTel)}?text=${msg}" target="wa_instituto" class="btn-wa">WA</a>`;
     })():''}
   `;
   if(t.labNombre){ poblarLabSelect('detLab'); document.getElementById('detLab').value=t.labNombre; }
@@ -2398,11 +2499,13 @@ function switchVista(v){
   const nb=document.getElementById('nb-'+v); if(nb) nb.classList.add('active');
   if(v==='doc'){ if(!profSelDoc) profSelDoc=profs[0].id; renderVistaMedico(); renderMiniCal(); }
   if(v==='gest') renderGestion();
-  if(v==='pac') renderPacientes();
+  if(v==='pac'){ renderPacientes(); asegurarPacientes(); }
 }
 
 function renderVistaMedico(){
   const p=gProf(profSelDoc); if(!p) return;
+  const _lunesD=getLunes(offSemana); const _vieD=new Date(_lunesD); _vieD.setDate(_lunesD.getDate()+4);
+  const turnosListos = asegurarRango('vista', fStr(_lunesD), fStr(_vieD));
   document.getElementById('docNomEl').textContent=`${p.nom} ${p.ape}`;
   document.getElementById('docEspEl').textContent=p.esp;
   const HOY=hoyStr();
@@ -2427,6 +2530,11 @@ function renderVistaMedico(){
       ${cnt&&!esA?`<span class="dtab-cnt" style="background:${p.color}">${cnt}</span>`:''}
     </button>`;
   }).join('');
+  if(!turnosListos){
+    document.getElementById('docTurnosEl').innerHTML='<div class="empty">Cargando turnos…</div>';
+    const _s=document.getElementById('docSlotsEl'); if(_s) _s.innerHTML='';
+    return;
+  }
   // Turnos del día seleccionado
   const ts=turnos.filter(t=>t.profesionalId===profSelDoc&&t.fecha===diaSelDoc&&t.estado!=='cancelado').sort((a,b)=>a.hora.localeCompare(b.hora));
   const tEl=document.getElementById('docTurnosEl');
@@ -2701,23 +2809,22 @@ function quitarAus(profId,fecha){
 
 // ── PACIENTES ─────────────────────────────────────────────────
 function renderPacientes(){
+  if(!pacientesCargados){
+    document.getElementById('pacSubEl').textContent='Cargando pacientes…';
+    document.getElementById('pacListaEl').innerHTML='<div class="empty">Cargando pacientes…</div>';
+    return;
+  }
   document.getElementById('pacSubEl').textContent=`${pacientes.length} paciente${pacientes.length!==1?'s':''}`;
   const lista=pacientes.slice().sort((a,b)=>(a.ape||'').localeCompare(b.ape||''));
   const el=document.getElementById('pacListaEl');
   if(!lista.length){el.innerHTML='<div class="empty">Sin pacientes registrados</div>';return;}
   el.innerHTML=lista.map(p=>{
     const ini=((p.ape||'').charAt(0)+(p.nom||'').charAt(0)).toUpperCase();
-    const cts=turnos.filter(t=>t.pacienteId===p.id&&t.estado!=='cancelado');
-    const ult=cts.sort((a,b)=>b.fecha.localeCompare(a.fecha))[0];
     return `<div class="pac-row" onclick="verFicha('${p.id}')">
       <div class="pac-ava">${ini}</div>
       <div style="flex:1">
         <div style="font-size:13px;font-weight:500">${p.ape||''}, ${p.nom||''}</div>
         <div style="font-size:11px;color:var(--gm);margin-top:1px">DNI: ${p.dni||'—'} · ${p.telefono||'Sin tel'}${p.obraSocial?' · '+p.obraSocial:''}</div>
-      </div>
-      <div style="text-align:right;flex-shrink:0">
-        <div style="font-size:12px;font-weight:500;color:var(--azul)">${cts.length} turno${cts.length!==1?'s':''}</div>
-        ${ult?`<div style="font-size:11px;color:var(--gm)">${labelF(ult.fecha)}</div>`:''}
       </div>
     </div>`;
   }).join('');
@@ -2844,7 +2951,9 @@ async function borrarPaciente(){
   const id = document.getElementById('npId').value;
   if(!id) return;
   const p = pacientes.find(x=>x.id===id);
-  const cantTurnos = turnos.filter(t=>t.pacienteId===id).length;
+  let cantTurnos = 0;
+  try{ cantTurnos = (await db.collection('turnos').where('pacienteId','==',id).get()).size; }
+  catch(e){ cantTurnos = turnos.filter(t=>t.pacienteId===id).length; }
 
   const msg = cantTurnos>0
     ? `¿Borrar a ${p?.ape||''}, ${p?.nom||''} definitivamente?\n\nTiene ${cantTurnos} turno(s) cargado(s). Los turnos NO se van a borrar (van a seguir viéndose en la agenda con su nombre), pero dejarán de estar vinculados a una ficha de paciente.\n\nEsta acción no se puede deshacer.`
@@ -2991,6 +3100,7 @@ function actualizarSlotsBloqueo(){
   const grid   = document.getElementById('blkSlotsGrid');
   document.getElementById('blkHora').value = '';
   if(!profId||!fecha){ grid.innerHTML='<div class="slot-none">Seleccioná profesional y fecha</div>'; return; }
+  if(!asegurarRango('modal', fecha, fecha)){ grid.innerHTML='<div class="slot-none">Cargando horarios…</div>'; return; }
 
   // Mostrar TODOS los slots del profesional ese día (libres y ocupados)
   // Para bloquear también se pueden elegir ocupados (sobrebloqueo)
