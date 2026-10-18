@@ -949,7 +949,7 @@ let LABORATORIOS = ['Naspi','Yebra','Paula','Natalia','Mauricio'];
 // Ventana de fechas que se mantiene sincronizada en vivo (evita traer TODA la
 // colección de turnos para siempre). La ficha de paciente consulta historial
 // completo por separado, así que esto no le afecta.
-const VENTANA_DIAS_ATRAS    = 14; // 2 semanas hacia atrás
+const VENTANA_DIAS_ATRAS    = 7; // 1 semana hacia atrás (cubre la semana en curso, de lunes a hoy)
 const VENTANA_DIAS_ADELANTE = 90; // ~3 meses hacia adelante
 // Semanas fuera de esta ventana se leen aparte, solo mientras se miran (ver asegurarRango).
 
@@ -1301,33 +1301,111 @@ function detenerListeners(){
     v.desde=''; v.hasta=''; v.docs=[]; v.listo=false;
   });
   turnos = [];
-  if(unsubPacs){ unsubPacs(); unsubPacs=null; }
-  pacientes = []; pacientesCargados = false; pacientesPromesa = null;
+  pacientes = []; pacientesCargados = false; pacientesPromesa = null; pacSincronizando = null;
   if(unsubProfsCfg){ unsubProfsCfg(); unsubProfsCfg=null; }
   if(unsubFeriados){ unsubFeriados(); unsubFeriados=null; }
 }
 
-// Los pacientes se cargan recién cuando hacen falta (Nuevo turno, Sobreturno,
-// pestaña Pacientes). Quien solo mira la agenda no los lee.
-function asegurarPacientes(){
-  if(pacientesPromesa) return pacientesPromesa;
-  pacientesPromesa = new Promise(resolve=>{
-    unsubPacs = db.collection('pacientes')
-      .onSnapshot(snap=>{
-        const primera = !pacientesCargados;
-        pacientes = snap.docs.map(d=>({...d.data(), id:d.id}));
-        pacientes.sort((a,b)=>(a.ape||'').localeCompare(b.ape||''));
-        pacientesCargados = true;
-        if(primera){ console.info(`[Firestore] pacientes leídos: ${pacientes.length}`); resolve(); }
-        if(document.getElementById('vPac').style.display==='flex') renderPacientes();
-      }, err=>{
-        console.error('onSnapshot pacientes error:', err);
-        toast('Error cargando pacientes: '+err.message, 'err');
-        pacientesPromesa = null;
-        resolve();
-      });
-  });
-  return pacientesPromesa;
+// ── PACIENTES: memoria local + solo los cambios ─────────────────────────────
+// Leer todos los pacientes en cada equipo y en cada apertura gastaba miles de
+// lecturas. Ahora cada equipo guarda la lista, y después solo pide a Firestore
+// los pacientes creados o modificados desde la última vez (campo actualizadoEn).
+// Una vez por semana se hace una lectura completa, para detectar pacientes
+// borrados o guardados por equipos que aún tenían una versión vieja del sistema.
+const PAC_CACHE_KEY = 'espejo_pacientes_v1';
+const PAC_FULL_CADA_MS = 7*24*3600*1000;
+const PAC_SYNC_MIN_MS = 15000; // no consultar cambios más seguido que esto
+let pacSyncMs = 0, pacFullAt = 0, pacUltimoSync = 0, pacSincronizando = null;
+
+function limpiarPaciente(d){
+  const x = {...d.data(), id:d.id};
+  delete x.creadoEn; delete x.actualizadoEn; // los Timestamp no se pueden guardar como texto
+  return x;
+}
+function ordenarPacientes(){ pacientes.sort((a,b)=>(a.ape||'').localeCompare(b.ape||'')); }
+function pacLeerCache(){
+  try{ const c = JSON.parse(localStorage.getItem(PAC_CACHE_KEY)||'null'); if(c && Array.isArray(c.list)) return c; }catch(e){}
+  return null;
+}
+function pacGuardarCache(){
+  try{ localStorage.setItem(PAC_CACHE_KEY, JSON.stringify({syncMs:pacSyncMs, fullAt:pacFullAt, list:pacientes})); }
+  catch(e){ console.warn('No se pudo guardar la memoria local de pacientes:', e.message); }
+}
+function renderPacientesSiVisible(){
+  if(document.getElementById('vPac').style.display==='flex') renderPacientes();
+}
+
+async function pacientesLecturaCompleta(){
+  const snap = await db.collection('pacientes').get();
+  pacientes = snap.docs.map(limpiarPaciente);
+  ordenarPacientes();
+  let max = 0;
+  snap.docs.forEach(d=>{ const au = d.get('actualizadoEn'); if(au && au.toMillis) max = Math.max(max, au.toMillis()); });
+  // Sin ningún paciente con actualizadoEn todavía: arrancamos 6 h atrás (margen por si el reloj del equipo está corrido)
+  pacSyncMs = max || (Date.now() - 6*3600*1000);
+  pacFullAt = Date.now(); pacUltimoSync = Date.now();
+  pacientesCargados = true;
+  pacGuardarCache();
+  console.info(`[Firestore] pacientes: lectura COMPLETA (${pacientes.length} leídos)`);
+  renderPacientesSiVisible();
+}
+
+async function pacientesCargaInicial(){
+  const c = pacLeerCache();
+  const vencida = !c || !c.fullAt || (Date.now()-c.fullAt) > PAC_FULL_CADA_MS || c.fullAt > Date.now();
+  if(c && !vencida){
+    pacientes = c.list; pacSyncMs = c.syncMs; pacFullAt = c.fullAt;
+    pacientesCargados = true;
+    console.info(`[Firestore] pacientes: ${pacientes.length} desde la memoria local (0 lecturas)`);
+    renderPacientesSiVisible();
+    return;
+  }
+  await pacientesLecturaCompleta();
+}
+
+// Trae solo lo creado/modificado desde la última sincronización
+async function sincronizarPacientes(forzar){
+  if(!pacientesCargados) return;
+  if(pacSincronizando) return pacSincronizando;
+  if(!forzar && Date.now()-pacUltimoSync < PAC_SYNC_MIN_MS) return;
+  pacSincronizando = (async()=>{
+    try{
+      const snap = await db.collection('pacientes')
+        .where('actualizadoEn','>',firebase.firestore.Timestamp.fromMillis(pacSyncMs)).get();
+      if(!snap.empty){
+        const mapa = new Map(pacientes.map(p=>[p.id,p]));
+        let max = pacSyncMs;
+        snap.docs.forEach(d=>{
+          mapa.set(d.id, limpiarPaciente(d));
+          const au = d.get('actualizadoEn'); if(au && au.toMillis) max = Math.max(max, au.toMillis());
+        });
+        pacSyncMs = max;
+        pacientes = [...mapa.values()]; ordenarPacientes();
+        pacGuardarCache();
+        renderPacientesSiVisible();
+      }
+      pacUltimoSync = Date.now();
+      console.info(`[Firestore] pacientes: ${snap.size} cambio(s) desde la última vez`);
+    }catch(e){
+      console.warn('No se pudo sincronizar pacientes:', e);
+    }finally{
+      pacSincronizando = null;
+    }
+  })();
+  return pacSincronizando;
+}
+
+// Se llama cada vez que hace falta la lista (Nuevo turno, Sobreturno, pestaña Pacientes, guardar)
+async function asegurarPacientes(){
+  if(!pacientesPromesa){
+    pacientesPromesa = pacientesCargaInicial().catch(err=>{
+      console.error('Error cargando pacientes:', err);
+      toast('Error cargando pacientes: '+err.message, 'err');
+      pacientesPromesa = null;
+    });
+  }
+  await pacientesPromesa;
+  await sincronizarPacientes(false);
 }
 
 function iniciarListeners(){
@@ -2145,9 +2223,11 @@ async function guardarTurno(){
           dni: dni,
           telefono: tel,
           obraSocial: obraSocial,
-          creadoEn: firebase.firestore.FieldValue.serverTimestamp()
+          creadoEn: firebase.firestore.FieldValue.serverTimestamp(),
+          actualizadoEn: firebase.firestore.FieldValue.serverTimestamp()
         });
         pacId = ref.id;
+        sincronizarPacientes(true); // suma al paciente nuevo a la lista local
       }
     }
 
@@ -2300,9 +2380,11 @@ async function guardarSobreturnoRapido(){
       if(!pacId){
         const ref = await db.collection('pacientes').add({
           nom: nom, ape: ape, dni: dni, telefono: tel, obraSocial: obraSocial,
-          creadoEn: firebase.firestore.FieldValue.serverTimestamp()
+          creadoEn: firebase.firestore.FieldValue.serverTimestamp(),
+          actualizadoEn: firebase.firestore.FieldValue.serverTimestamp()
         });
         pacId = ref.id;
+        sincronizarPacientes(true);
       }
     }
 
@@ -2917,7 +2999,8 @@ function agregarNotaTurno(turnoId, pacId){
 
 async function guardarNotaGeneral(pacId){
   const nota=document.getElementById('fichaNotaG').value.trim().toUpperCase();
-  await db.collection('pacientes').doc(pacId).update({notaGeneral:nota});
+  await db.collection('pacientes').doc(pacId).update({notaGeneral:nota, actualizadoEn: firebase.firestore.FieldValue.serverTimestamp()});
+  await sincronizarPacientes(true);
   toast('Nota guardada ✓','ok');
 }
 
@@ -2963,6 +3046,7 @@ async function borrarPaciente(){
 
   try{
     await db.collection('pacientes').doc(id).delete();
+    pacientes = pacientes.filter(p=>p.id!==id); pacGuardarCache(); renderPacientesSiVisible();
     toast('Paciente borrado ✓','ok');
     cerrarModal('mNuevoPac');
   }catch(e){
@@ -2984,6 +3068,8 @@ async function guardarPaciente(){
     obraSocial:document.getElementById('npOs').value.trim(),
     antecedentes:document.getElementById('npAnte').value.trim(),
   };
+  data.actualizadoEn=firebase.firestore.FieldValue.serverTimestamp();
+  await asegurarPacientes();
   if(id){
     await db.collection('pacientes').doc(id).update(data);
     toast('Paciente actualizado ✓','ok');
@@ -2992,6 +3078,7 @@ async function guardarPaciente(){
     await db.collection('pacientes').add(data);
     toast('Paciente creado ✓','ok');
   }
+  await sincronizarPacientes(true);
   cerrarModal('mNuevoPac');
 }
 
