@@ -115,16 +115,15 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
 .mc-dh{font-size:10px;text-align:center;color:var(--gm);font-weight:500}
 .mc-d{font-size:11px;text-align:center;padding:5px 2px;border-radius:5px;cursor:pointer;border:1.5px solid transparent;position:relative}
 .mc-d:hover{background:var(--azulp);color:var(--azul)}
-.mc-d.hoy{background:var(--azul);color:white;font-weight:500}
+.mc-d.hoy{background:#1E6FD9;color:white;font-weight:600}
 .mc-d.finde{color:var(--bor)!important;cursor:not-allowed;background:var(--gc)!important}
-.mc-d.tiene-dado{background:var(--verdep);color:#0F6E56;font-weight:500}
-.mc-d.tiene-espera{background:var(--ambarp);color:#854F0B;font-weight:500}
-.mc-d.hoy.tiene-dado,.mc-d.hoy.tiene-espera{background:var(--azul);color:white}
+.mc-d.tiene-dado{}
+.mc-d.tiene-espera{}
 .mc-d.aus-prof{background:var(--rojop)!important;color:var(--rojo)!important;cursor:not-allowed;text-decoration:line-through}
 .mc-d.no-atiende{color:var(--bor)!important;cursor:not-allowed;background:var(--gc)!important;opacity:.6}
 .mc-d.feriado{background:#B91C1C!important;color:white!important;font-weight:600;text-decoration:line-through}
 .mc-d.semana-sel{background:var(--azulp)!important;color:var(--azul)}
-.mc-d.semana-sel.hoy{background:var(--azul)!important;color:white!important;box-shadow:0 0 0 2px var(--azulp)}
+.mc-d.semana-sel.hoy{background:#1E6FD9!important;color:white!important;font-weight:600;box-shadow:0 0 0 2px var(--azulp)}
 #btnModoFeriados.activo{background:#B91C1C;color:white;border-color:#B91C1C}
 .stat-sm{background:var(--gc);border-radius:var(--r);padding:.65rem .85rem;margin-bottom:.5rem}
 .stat-sm-v{font-size:20px;font-weight:600;color:var(--azul);line-height:1}
@@ -399,7 +398,7 @@ body{font-family:'Inter',sans-serif;background:#EEF2F7;color:var(--go);min-heigh
       <div class="toggle-izq-wrap">
         <aside class="sb-izq" id="sbIzq" style="flex:1">
           <div style="padding:0 .6rem .5rem"><div class="sb-lbl">Profesionales</div><div id="profList"></div></div>
-          <div style="font-size:9px;color:#b5b3ab;padding:.75rem .85rem .25rem" title="Versión del sistema">v2026.10.20-b</div>
+          <div style="font-size:9px;color:#b5b3ab;padding:.75rem .85rem .25rem" title="Versión del sistema">v2026.10.20-c</div>
         </aside>
         <button class="toggle-sb" onclick="toggleSidebar('izq')" id="btnToggleIzq" title="Ocultar/mostrar profesionales">‹</button>
       </div>
@@ -891,7 +890,7 @@ const firebaseConfig = {
   appId: "1:242012179287:web:de2faee7b0572d94e68c12"
 };
 firebase.initializeApp(firebaseConfig);
-console.info('[Sistema] versión v2026.10.20-b');
+console.info('[Sistema] versión v2026.10.20-c');
 const db   = firebase.firestore();
 const auth = firebase.auth();
 
